@@ -64,4 +64,40 @@ public abstract class BaseComposer {
     protected static void require(ComponentFactory f, String name) throws CircuitException {
         if (f == null) throw new CircuitException(name + " not found");
     }
+
+    /** Intenta setear el modo de signo en un comparador (SIGNED / UNSIGNED). */
+    protected static void setComparatorSignMode(AttributeSet attrs, boolean signed) {
+        // Soporta ambos tipos de atributos: "mode" o "signMode"
+        if (!setParsedIfPresent(attrs, "signMode", signed ? "signed" : "unsigned")) {
+            setParsedIfPresent(attrs, "mode", signed ? "twosComplement" : "unsigned");
+        }
+    }
+
+    /** Busca un atributo por name dentro del AttributeSet. */
+    protected static Attribute<?> findAttrByName(AttributeSet attrs, String name) {
+        for (Attribute<?> a : attrs.getAttributes()) {
+            if (name.equals(a.getName())) return a;
+        }
+        return null;
+    }
+
+    /** Core: parsea y setea usando Attribute.parse(token). Devuelve true si pudo setear. */
+    protected static boolean setParsedByName(AttributeSet attrs, String name, String token) {
+        Attribute<?> a = findAttrByName(attrs, name);
+        if (a == null) return false;
+        try {
+            @SuppressWarnings("unchecked")
+            Attribute<Object> ax = (Attribute<Object>) a;
+            Object parsed = ax.parse(token);
+            attrs.setValue(ax, parsed);
+            return true;
+        } catch (Exception ignore) {
+            return false;
+        }
+    }
+
+    protected static boolean setParsedIfPresent(AttributeSet attrs, String name, String token) {
+        if (token == null || token.isBlank()) return false;
+        return setParsedByName(attrs, name, token);
+    }
 }

@@ -10,6 +10,8 @@ import com.cburch.logisim.data.Direction;
 import com.cburch.logisim.data.Location;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.UnaryOp;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.UnaryOpParams;
 import com.cburch.logisim.verilog.std.InstanceHandle;
 import com.cburch.logisim.verilog.std.adapters.BaseComposer;
 import com.cburch.logisim.verilog.std.macrocomponents.ComposeCtx;
@@ -31,6 +33,8 @@ public final class UnaryOpComposer extends BaseComposer {
         require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate"); require(ctx.fx.pinF, "Pin");
         final String name = MacroSubcktKit.macroName("reduce_or", aWidth);
 
+        UnaryOpParams p = new UnaryOpParams(UnaryOp.REDUCE_OR, cell.params().asMap());
+
         BiConsumer<ComposeCtx, Circuit> populate = (in, macro) -> {
             try {
                 Location cmpLoc = Location.create(200, 120);
@@ -39,6 +43,8 @@ public final class UnaryOpComposer extends BaseComposer {
                 Component pinY = addPin(in, "Y", true, 1, cmpLoc.translate(30,0));
 
                 Component cmp = add(in, in.fx.cmp, cmpLoc, attrsWithWidthAndLabel(in.fx.cmp, aWidth, "A==0"));
+                setComparatorSignMode(cmp.getAttributeSet(), p.aSigned());
+
                 if (in.fx.constF != null) {
                     AttributeSet k = in.fx.constF.createAttributeSet();
                     setByNameParsed(k, "width", Integer.toString(aWidth));
@@ -64,6 +70,8 @@ public final class UnaryOpComposer extends BaseComposer {
         require(ctx.fx.cmp, "Comparator"); require(ctx.fx.pinF, "Pin");
         final String name = MacroSubcktKit.macroName("reduce_and", aWidth);
 
+        UnaryOpParams p = new UnaryOpParams(UnaryOp.REDUCE_AND, cell.params().asMap());
+
         BiConsumer<ComposeCtx, Circuit> populate = (in, macro) -> {
             try {
                 Location cmpLoc = Location.create(200, 120);
@@ -72,6 +80,7 @@ public final class UnaryOpComposer extends BaseComposer {
                 Component pinY = addPin(in, "Y", true, 1, cmpLoc);
 
                 Component cmp = add(in, in.fx.cmp, cmpLoc, attrsWithWidthAndLabel(in.fx.cmp, aWidth, "A==all1"));
+                setComparatorSignMode(cmp.getAttributeSet(), p.aSigned());
                 if (in.fx.constF != null) {
                     AttributeSet k = in.fx.constF.createAttributeSet();
                     setByNameParsed(k, "width", Integer.toString(aWidth));

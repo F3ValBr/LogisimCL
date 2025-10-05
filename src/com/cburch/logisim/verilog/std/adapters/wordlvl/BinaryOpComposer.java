@@ -5,6 +5,8 @@ import com.cburch.logisim.circuit.CircuitException;
 import com.cburch.logisim.comp.Component;
 import com.cburch.logisim.data.Location;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.BinaryOp;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.BinaryOpParams;
 import com.cburch.logisim.verilog.std.InstanceHandle;
 import com.cburch.logisim.verilog.std.adapters.BaseComposer;
 import com.cburch.logisim.verilog.std.macrocomponents.ComposeCtx;
@@ -24,6 +26,8 @@ public final class BinaryOpComposer extends BaseComposer {
         require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate");
         final String name = MacroSubcktKit.macroName("ne(!=)", aWidth, bWidth);
 
+        BinaryOpParams p = new BinaryOpParams(BinaryOp.NE, cell.params().asMap());
+
         BiConsumer<ComposeCtx, Circuit> populate = (in, macro) -> {
             try {
                 Location cLoc = Location.create(200, 120);
@@ -35,6 +39,9 @@ public final class BinaryOpComposer extends BaseComposer {
                 // Comparator
                 Component cmp = add(in, in.fx.cmp, cLoc,
                         attrsWithWidthAndLabel(in.fx.cmp, Math.max(aWidth, bWidth), "CMP"));
+
+                // 👉 Setear signo (usa los flags de BinaryOpParams)
+                setComparatorSignMode(cmp.getAttributeSet(), p.aSigned() || p.bSigned());
 
                 // Wiring A->cmp.A (izquierda alta)
                 addWire(in, pinA.getLocation(), pinA.getLocation().translate(20, 0));
@@ -64,6 +71,8 @@ public final class BinaryOpComposer extends BaseComposer {
         require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate");
         final String name = MacroSubcktKit.macroName("le(<=)", aWidth, bWidth);
 
+        BinaryOpParams p = new BinaryOpParams(BinaryOp.LE, cell.params().asMap());
+
         BiConsumer<ComposeCtx, Circuit> populate = (in, macro) -> {
             try {
                 Location cLoc = Location.create(200, 120);
@@ -75,6 +84,9 @@ public final class BinaryOpComposer extends BaseComposer {
                 // Comparator
                 Component cmp = add(in, in.fx.cmp, cLoc,
                         attrsWithWidthAndLabel(in.fx.cmp, Math.max(aWidth, bWidth), "CMP"));
+
+                // 👉 Setear signo (usa los flags de BinaryOpParams)
+                setComparatorSignMode(cmp.getAttributeSet(), p.aSigned() || p.bSigned());
 
                 // Wiring A->cmp.A (izquierda alta)
                 addWire(in, pinA.getLocation(), pinA.getLocation().translate(20, 0));
@@ -104,6 +116,8 @@ public final class BinaryOpComposer extends BaseComposer {
         require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate");
         final String name = MacroSubcktKit.macroName("ge(>=)", aWidth, bWidth);
 
+        BinaryOpParams p = new BinaryOpParams(BinaryOp.GE, cell.params().asMap());
+
         BiConsumer<ComposeCtx, Circuit> populate = (in, macro) -> {
             try {
                 Location cLoc = Location.create(200, 120);
@@ -115,6 +129,9 @@ public final class BinaryOpComposer extends BaseComposer {
                 // Comparator
                 Component cmp = add(in, in.fx.cmp, cLoc,
                         attrsWithWidthAndLabel(in.fx.cmp, Math.max(aWidth, bWidth), "CMP"));
+
+                // 👉 Setear signo (usa los flags de BinaryOpParams)
+                setComparatorSignMode(cmp.getAttributeSet(), p.aSigned() || p.bSigned());
 
                 // Wiring A->cmp.A (izquierda alta)
                 addWire(in, pinA.getLocation(), pinA.getLocation().translate(20, 0));

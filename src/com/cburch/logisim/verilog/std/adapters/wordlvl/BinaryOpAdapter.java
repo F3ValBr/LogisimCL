@@ -80,9 +80,6 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
 
         boolean aSigned = false, bSigned = false;
         if (cell.params() instanceof BinaryOpParams bp) {
-            // width preferente (Y_WIDTH)
-            width   = Math.max(1, bp.yWidth() > 0 ? bp.yWidth()
-                    : Math.max(bp.aWidth(), Math.max(bp.bWidth(), width)));
             aSigned = bp.aSigned();
             bSigned = bp.bSigned();
         }
@@ -243,7 +240,7 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
             int y = bp.yWidth();
             int a = bp.aWidth();
             int b = bp.bWidth();
-            int w = (y > 0) ? y : Math.max(a, b);
+            int w = Math.max(a, b);
             return Math.max(1, w);
         }
         if (params instanceof GenericCellParams g) {

@@ -10,7 +10,6 @@ import com.cburch.logisim.data.AttributeSet;
 import com.cburch.logisim.data.BitWidth;
 import com.cburch.logisim.data.Location;
 import com.cburch.logisim.file.LogisimFile;
-import com.cburch.logisim.gui.main.Canvas;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.std.plexers.Plexers;
@@ -46,19 +45,19 @@ public final class MuxOpAdapter extends AbstractComponentAdapter
     }
 
     @Override
-    public InstanceHandle create(Canvas canvas, Graphics g, VerilogCell cell, Location where) {
+    public InstanceHandle create(Project proj, Circuit circ, Graphics g, VerilogCell cell, Location where) {
         final MuxOp op;
         try {
             op = MuxOp.fromYosys(cell.type().typeId());
         } catch (Exception e) {
             // tipo desconocido → fallback
-            return fallback.create(canvas, g, cell, where);
+            return fallback.create(proj, circ, g, cell, where);
         }
 
-        LibFactory lf = pickFactoryOrNull(canvas.getProject(), op);
+        LibFactory lf = pickFactoryOrNull(proj, op);
         if (lf == null || lf.factory == null) {
             // No hay mapeo nativo → subcircuito
-            return fallback.create(canvas, g, cell, where);
+            return fallback.create(proj, circ, g, cell, where);
         }
 
         // Heurísticas de ancho (datos) y select (si aplica)
@@ -66,9 +65,6 @@ public final class MuxOpAdapter extends AbstractComponentAdapter
         int selWidth  = guessSelectWidth(cell.params()); // S_WIDTH si el op lo tiene (bmux/pmux, etc.)
 
         try {
-            Project proj = canvas.getProject();
-            Circuit circ = canvas.getCircuit();
-
             AttributeSet attrs = lf.factory.createAttributeSet();
 
             // Intentar fijar ancho de bus (cuando el factory expose StdAttr.WIDTH)

@@ -8,7 +8,6 @@ import com.cburch.logisim.comp.Component;
 import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.data.*;
 import com.cburch.logisim.file.LogisimFile;
-import com.cburch.logisim.gui.main.Canvas;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.tools.Library;
@@ -59,10 +58,10 @@ public final class RegisterOpAdapter extends AbstractComponentAdapter
     }
 
     @Override
-    public InstanceHandle create(Canvas canvas, Graphics g, VerilogCell cell, Location where) {
-        LibFactory lf = pickRegisterFactory(canvas.getProject());
+    public InstanceHandle create(Project proj, Circuit circ, Graphics g, VerilogCell cell, Location where) {
+        LibFactory lf = pickRegisterFactory(proj);
         if (lf == null) {
-            return fallback.create(canvas, g, cell, where);
+            return fallback.create(proj, circ, g, cell, where);
         }
 
         final CellParams params = cell.params();
@@ -90,8 +89,6 @@ public final class RegisterOpAdapter extends AbstractComponentAdapter
         final ResetInfo rst = detectReset(cell);
 
         try {
-            Project proj = canvas.getProject();
-            Circuit circ = canvas.getCircuit();
             AttributeSet attrs = lf.factory.createAttributeSet();
 
             // Básicos
@@ -135,7 +132,7 @@ public final class RegisterOpAdapter extends AbstractComponentAdapter
             // - $sr (latch SR puro): por ahora fallback (no tiene clock/enable estándar).
             if (typeId.equals("$sr")) {
                 // TODO: mapear $sr a Register más adelante, cambiar esto.
-                return fallback.create(canvas, g, cell, where);
+                return fallback.create(proj, circ, g, cell, where);
             }
 
             Component comp = addComponent(proj, circ, g, lf.factory, where, attrs);

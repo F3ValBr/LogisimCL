@@ -10,7 +10,6 @@ import com.cburch.logisim.data.AttributeSet;
 import com.cburch.logisim.data.BitWidth;
 import com.cburch.logisim.data.Location;
 import com.cburch.logisim.file.LogisimFile;
-import com.cburch.logisim.gui.main.Canvas;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.tools.Library;
@@ -50,17 +49,18 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
     }
 
     @Override
-    public InstanceHandle create(Canvas canvas, Graphics g, VerilogCell cell, Location where) {
+    public InstanceHandle create(Project proj, Circuit circ, Graphics g, VerilogCell cell, Location where) {
         final BinaryOp op;
         try {
             op = BinaryOp.fromYosys(cell.type().typeId());
         } catch (Exception e) {
-            return fallback.create(canvas, g, cell, where);
+            return fallback.create(proj, circ, g, cell, where);
         }
 
+        // ¿hay receta macro? -> compón en el circuito destino (no el del canvas)
         MacroRegistry.Recipe recipe = registry.find(cell.type().typeId());
         if (recipe != null) {
-            var ctx = new ComposeCtx(canvas.getProject(), canvas.getCircuit(), g, Factories.warmup(canvas.getProject()));
+            var ctx = new ComposeCtx(proj, circ, g, Factories.warmup(proj));
             try {
                 return recipe.build(ctx, cell, where);
             } catch (CircuitException e) {
@@ -69,15 +69,14 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
         }
 
         // 1) Elegir factory según operación ($and/$or/$xor/$xnor → Gates; $add/$sub/$mul → Arithmetic)
-        LibFactory lf = pickFactoryOrNull(canvas.getProject(), op);
+        LibFactory lf = pickFactoryOrNull(proj, op);
         if (lf == null || lf.factory == null) {
-            // no soportado nativamente → subcircuito
-            return fallback.create(canvas, g, cell, where);
+            // no soportado nativamente → subcircuito (en el circuito destino)
+            return fallback.create(proj, circ, g, cell, where);
         }
 
         // 2) Width y signo desde params tipados si existen
         int width = guessBinaryWidth(cell.params()); // fallback genérico
-
         boolean aSigned = false, bSigned = false;
         if (cell.params() instanceof BinaryOpParams bp) {
             aSigned = bp.aSigned();
@@ -85,9 +84,6 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
         }
 
         try {
-            Project proj = canvas.getProject();
-            Circuit circ = canvas.getCircuit();
-
             AttributeSet attrs = lf.factory.createAttributeSet();
 
             // Ancho de bus
@@ -95,24 +91,22 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
             // Etiqueta
             try { attrs.setValue(StdAttr.LABEL, cleanCellName(cell.name())); } catch (Exception ignore) { }
 
-            // Signo
+            // Signo (si el componente tiene el atributo correspondiente)
             applySignedModeIfAvailable(attrs, op, aSigned, bSigned);
 
-            // Nota: Para $add/$sub Logisim “Adder/Subtractor” tienen pines Cin/Cout.
-            // Aquí solo creamos el componente; el cableado (p. ej. Cin=0) lo resolverás en tu fase de wiring/túneles.
+            // Nota: Para $add/$sub, el cableado de Cin/Cout lo resuelves en tu fase de wiring/túneles.
 
             Component comp = addComponent(proj, circ, g, lf.factory, where, attrs);
 
             // Mapa nombre->índice específico de ESTA instancia (usa library + factory + instance)
             Map<String,Integer> nameToIdx = switch (op.category()) {
                 case COMPARE -> {
-                    // Selecciona qué pin del Comparator debe ser “Y”
+                    // Selecciona cuál salida del Comparator mapeamos como “Y”
                     BuiltinPortMaps.ComparatorOut outSel = switch (op) {
                         case EQ -> BuiltinPortMaps.ComparatorOut.EQ;
                         case LT -> BuiltinPortMaps.ComparatorOut.LT;
                         case GT -> BuiltinPortMaps.ComparatorOut.GT;
-                        // Si quieres cubrir LE/GE/NE más adelante, compón con puertas extra o
-                        // crea otra ruta. Por ahora, default a EQ.
+                        // LE/GE/NE los compones fuera (ya tienes macros); aquí default a EQ
                         default -> BuiltinPortMaps.ComparatorOut.EQ;
                     };
                     yield BuiltinPortMaps.forComparator(lf.lib, lf.factory, comp, outSel);

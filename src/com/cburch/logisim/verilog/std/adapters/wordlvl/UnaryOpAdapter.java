@@ -7,7 +7,6 @@ import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.data.AttributeSet;
 import com.cburch.logisim.data.BitWidth;
 import com.cburch.logisim.data.Location;
-import com.cburch.logisim.gui.main.Canvas;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.tools.Library;
@@ -49,12 +48,9 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
     }
 
     @Override
-    public InstanceHandle create(Canvas canvas, Graphics g, VerilogCell cell, Location where) {
+    public InstanceHandle create(Project proj, Circuit circ, Graphics g, VerilogCell cell, Location where) {
         UnaryOp op = UnaryOp.fromYosys(cell.type().typeId());
         try {
-            Project proj = canvas.getProject();
-            Circuit circ = canvas.getCircuit();
-
             // 1) Receta compuesta (si existe)
             MacroRegistry.Recipe recipe = registry.find(cell.type().typeId());
             if (recipe != null) {
@@ -65,7 +61,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
             // 2) Factory nativo (+ library) si hay
             LibAndFactory lf = pickFactory(proj, op);
             if (lf == null || lf.factory() == null) {
-                return fallback.create(canvas, g, cell, where);
+                return fallback.create(proj, circ, g, cell, where);
             }
 
             int width = guessUnaryWidth(cell.params());

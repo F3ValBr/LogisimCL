@@ -7,7 +7,6 @@ import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.data.AttributeSet;
 import com.cburch.logisim.data.BitWidth;
 import com.cburch.logisim.data.Location;
-import com.cburch.logisim.gui.main.Canvas;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.tools.Library;
@@ -59,22 +58,22 @@ public final class MemoryOpAdapter extends AbstractComponentAdapter
     }
 
     @Override
-    public InstanceHandle create(Canvas canvas, Graphics g, VerilogCell cell, Location where) {
+    public InstanceHandle create(Project proj, Circuit circ, Graphics g, VerilogCell cell, Location where) {
         try {
             // Sin índice → no podemos unificar → fallback
             if (currentMemIndex == null) {
-                return fallback.create(canvas, g, cell, where);
+                return fallback.create(proj, circ, g, cell, where);
             }
 
             // Lee MEMID de la celda
             String memId = readMemId(cell.params());
             if (memId == null || memId.isEmpty()) {
-                return fallback.create(canvas, g, cell, where);
+                return fallback.create(proj, circ, g, cell, where);
             }
 
             LogicalMemory lm = currentMemIndex.get(memId);
             if (lm == null) {
-                return fallback.create(canvas, g, cell, where);
+                return fallback.create(proj, circ, g, cell, where);
             }
 
             // Si ya instanciamos la memoria lógica (por MEMID), no dupliques.
@@ -83,7 +82,7 @@ public final class MemoryOpAdapter extends AbstractComponentAdapter
                 return new InstanceHandle(null, null);
             }
 
-            InstanceHandle ih = createUnifiedRamOrRom(canvas, g, cell, where, lm);
+            InstanceHandle ih = createUnifiedRamOrRom(proj, circ, g, cell, where, lm);
             createdMemIds.add(lm.memId());
             return ih;
 
@@ -121,14 +120,11 @@ public final class MemoryOpAdapter extends AbstractComponentAdapter
         }
     }
 
-    private InstanceHandle createUnifiedRamOrRom(Canvas canvas, Graphics g,
+    private InstanceHandle createUnifiedRamOrRom(Project proj, Circuit circ, Graphics g,
                                                  VerilogCell anyCellOfThisMem,
                                                  Location where,
                                                  LogicalMemory lm)
             throws CircuitException {
-        Project proj = canvas.getProject();
-        Circuit circ = canvas.getCircuit();
-
         // 1) Deducir parámetros (width / depth / abits)
         int width = 8;
         int depth = 256;
@@ -155,7 +151,7 @@ public final class MemoryOpAdapter extends AbstractComponentAdapter
         // 2) Elegir librería/Factory
         LibFactory lf = pickMemoryFactory(proj, hasWrite);
         if (lf == null) {
-            return fallback.create(canvas, g, anyCellOfThisMem, where);
+            return fallback.create(proj, circ, g, anyCellOfThisMem, where);
         }
 
         // 3) Atributos para tu RAM/ROM

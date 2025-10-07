@@ -9,6 +9,7 @@ import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.comp.EndData;
 import com.cburch.logisim.data.*;
 import com.cburch.logisim.file.LogisimFile;
+import com.cburch.logisim.file.LogisimFileActions;
 import com.cburch.logisim.gui.main.Canvas;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.proj.Project;
@@ -16,21 +17,23 @@ import com.cburch.logisim.std.arith.ArithmeticPortMapRegister;
 import com.cburch.logisim.std.gates.GatesPortMapRegister;
 import com.cburch.logisim.std.memory.MemoryPortMapRegister;
 import com.cburch.logisim.std.plexers.PlexersPortMapRegister;
-import com.cburch.logisim.std.wiring.Constant;
 import com.cburch.logisim.std.wiring.Pin;
 import com.cburch.logisim.std.wiring.Tunnel;
 import com.cburch.logisim.std.yosys.YosysComponentsPortMapRegister;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.comp.CellFactoryRegistry;
 import com.cburch.logisim.verilog.comp.auxiliary.*;
-import com.cburch.logisim.verilog.comp.auxiliary.netconn.BitRef;
-import com.cburch.logisim.verilog.comp.auxiliary.netconn.Const0;
 import com.cburch.logisim.verilog.comp.auxiliary.netconn.PortDirection;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleBuilder;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleImpl;
+import com.cburch.logisim.verilog.file.JsonSynthFile;
 import com.cburch.logisim.verilog.file.jsonhdlr.YosysJsonNetlist;
 import com.cburch.logisim.verilog.file.jsonhdlr.YosysModuleDTO;
+import com.cburch.logisim.verilog.file.materializer.ModuleMaterializer;
+import com.cburch.logisim.verilog.file.ui.ImportCompletionDialog;
+import com.cburch.logisim.verilog.file.ui.MissingModuleDialog;
+import com.cburch.logisim.verilog.file.ui.NavigationHelper;
 import com.cburch.logisim.verilog.layout.LayoutUtils;
 import com.cburch.logisim.verilog.layout.MemoryIndex;
 import com.cburch.logisim.verilog.layout.ModuleNetIndex;
@@ -42,17 +45,27 @@ import com.cburch.logisim.verilog.std.BuiltinPortMaps;
 import com.cburch.logisim.verilog.std.ComponentAdapterRegistry;
 import com.cburch.logisim.verilog.std.InstanceHandle;
 import com.cburch.logisim.verilog.std.Strings;
+import com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter;
 import com.cburch.logisim.verilog.std.adapters.wordlvl.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.eclipse.elk.graph.ElkNode;
 
+import javax.swing.*;
 import java.awt.Graphics;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.cburch.logisim.data.Direction.*;
+import static com.cburch.logisim.verilog.file.importer.ImporterUtils.*;
+import static com.cburch.logisim.verilog.std.AbstractComponentAdapter.setParsedByName;
 
 public final class VerilogJsonImporter {
+
+    private Path baseDir;                           // carpeta del JSON
 
     private final CellFactoryRegistry registry;
     private final VerilogModuleBuilder builder;
@@ -63,13 +76,17 @@ public final class VerilogJsonImporter {
             .register(new MuxOpAdapter())
             .register(new RegisterOpAdapter())
             .register(memoryAdapter)
+            .register(new ModuleBlackBoxAdapter(createFileSystemMaterializer()))
             ;
     private final NodeSizer sizer = new DefaultNodeSizer(adapter);
 
-    private static final int GRID  = 10;
-    private static final int MIN_X = 100;
-    private static final int MIN_Y = 100;
-    private static final int PAD_X = 100; // separación horizontal respecto a las celdas
+    static final int GRID  = 10;
+    static final int MIN_X = 100;
+    static final int MIN_Y = 100;
+    static final int SEPARATION_INPUT_CELLS = 150; // separación horizontal entre inputs y celdas
+    static final int PAD_X = SEPARATION_INPUT_CELLS + 100; // separación horizontal respecto a las celdas
+
+    private volatile boolean importAllRemaining = false; // si el usuario elige “importar todo” en MissingModuleDialog
 
     public VerilogJsonImporter(CellFactoryRegistry registry) {
         this.registry = registry;
@@ -78,8 +95,6 @@ public final class VerilogJsonImporter {
 
     public void importInto(Project proj) {
         System.out.println("Importing JSON Verilog...");
-
-        // Bootstrap de port-maps (una sola vez por archivo)
         BuiltinPortMaps.initOnce(
                 proj.getLogisimFile(),
                 List.of(
@@ -90,28 +105,69 @@ public final class VerilogJsonImporter {
                         new YosysComponentsPortMapRegister()
                 ));
 
-        JsonNode root = proj.getLogisimFile().getLoader().JSONImportChooser(proj.getFrame());
-        if (root == null) {
+        // 1) Elegir archivo y recordar carpeta base
+        var res = proj.getLogisimFile().getLoader().JSONImportChooserWithPath(proj.getFrame());
+        if (res == null || res.root() == null || res.path() == null) {
             System.out.println("Import cancelled.");
             return;
         }
+        // === Contexto de importación / materialización ===
+        // JSON actualmente importado (ruta)
+        Path primaryJson                = res.path();                           // Path del JSON principal
+        YosysJsonNetlist currentNetlist = YosysJsonNetlist.from(res.root());    // netlist del JSON principal
+        this.baseDir                    = primaryJson.getParent();              // Carpeta base
 
-        // Netlist y canvas
-        YosysJsonNetlist netlist = YosysJsonNetlist.from(root);
-        Canvas canvas = proj.getFrame().getCanvas();
-        Graphics g = canvas.getGraphics(); // si es null, los adapters usan fallback
+        // 3) Importar todo el netlist (crea un circuito por módulo)
+        Circuit mainCirc = doImportNetlist(proj, currentNetlist);
 
+        // 4) Tras importar, construir map nombre→Circuit para el diálogo
+        // Mostrar diálogo sólo si tenemos un circuito principal
+        if (mainCirc != null) {
+            var choice = ImportCompletionDialog.show(proj.getFrame(), mainCirc.getName());
+            if (choice == ImportCompletionDialog.Choice.GO_TO_MODULE) {
+                boolean ok = NavigationHelper.switchToCircuit(proj, mainCirc);
+                if (!ok) {
+                    NavigationHelper.showManualSwitchHint(proj, mainCirc);
+                }
+            }
+        }
+    }
+
+    /* ===== Helpers ===== */
+
+    // == Tu bucle actual de importación por módulos, factorízalo aquí ==
+    private Circuit doImportNetlist(Project proj, YosysJsonNetlist netlist) {
+        // Graphics de respaldo independiente del canvas actual
+        Graphics g = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).getGraphics();
+
+        Circuit mainCirc = null;
         int totalCells = 0;
 
-        // Recorremos módulos del netlist
+        // Asegura un circuito por módulo y guarda el mapping
+        Map<String, Circuit> circuitsByModule = new HashMap<>();
         for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) netlist.modules()::iterator) {
-            // Construcción del módulo
+            String modName = dto.name();
+            circuitsByModule.put(modName, ensureCircuit(proj, modName));
+        }
+
+        // Recorre y construye cada módulo en su Circuit correspondiente
+        for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) netlist.modules()::iterator) {
+            String modName = dto.name();
+            Circuit target = circuitsByModule.get(modName);
+            if (target == null) {
+                // fallback defensivo
+                target = ensureCircuit(proj, modName);
+                circuitsByModule.put(modName, target);
+            }
+            if (mainCirc == null) mainCirc = target;
+
+            // Construcción del módulo lógico
             VerilogModuleImpl mod = builder.buildModule(dto);
 
             System.out.println("== Módulo: " + mod.name() + " ==");
             printModulePorts(mod);
 
-            // Índices auxiliares (para layout y memorias)
+            // Índices auxiliares (layout/memorias)
             ModuleNetIndex netIndex = builder.buildNetIndex(mod);
             printNets(mod, netIndex);
 
@@ -122,17 +178,17 @@ public final class VerilogJsonImporter {
             // 1) Alias de celdas de memoria
             Map<VerilogCell, VerilogCell> cellAlias = buildMemoryCellAlias(mod, memIndex);
 
-            // 2) Layout con alias (ELK)
+            // 2) Layout (ELK) con alias
             LayoutBuilder.Result elk = LayoutBuilder.build(proj, mod, netIndex, sizer, cellAlias);
             LayoutRunner.run(elk.root);
             LayoutUtils.applyLayoutAndClamp(elk.root, MIN_X, MIN_Y);
 
-            // 3) Colocar pins top separados y guardar anchors
+            // 3) Colocar pins top en el circuito del módulo y guardar anchors
             Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
             Map<ModulePort, PortAnchor>      topAnchors  = new HashMap<>();
-            addModulePortsToCircuitSeparated(proj, canvas.getCircuit(), mod, elk, netIndex, g, topAnchors);
+            addModulePortsToCircuitSeparated(proj, target, mod, elk, netIndex, g, topAnchors);
 
-            // 4) Instanciar sólo celdas no-aliased y guardar sus PortGeom
+            // 4) Instanciar sólo celdas no-aliased en el circuito del módulo
             for (int i = 0; i < mod.cells().size(); i++) {
                 VerilogCell cell = mod.cells().get(i);
                 if (cellAlias.containsKey(cell)) continue;
@@ -141,27 +197,24 @@ public final class VerilogJsonImporter {
                 int x = (n == null) ? snap(MIN_X) : snap((int) Math.round(n.getX()));
                 int y = (n == null) ? snap(MIN_Y) : snap((int) Math.round(n.getY()));
 
-                // pequeño ajuste Y para alineamiento de puerto
-                InstanceHandle h = adapter.create(canvas, g, cell, Location.create(x, y + 10));
+                // Instanciación en el circuito objetivo (NO canvas.getCircuit())
+                InstanceHandle h = adapter.create(proj, target, g, cell, Location.create(x + SEPARATION_INPUT_CELLS, y + 10));
                 cellHandles.put(cell, h);
                 totalCells++;
             }
 
-            // 5) Etiquetas preferidas por netId (top name si existe)
-            Map<Integer, String> netLabel = buildNetLabels(mod); // (por si luego lo usas externamente)
+            // 5) Batch por módulo para túneles y constantes en el circuito del módulo
+            ImportBatch batch = new ImportBatch(target);
 
-            // ========= NUEVO: BATCH por MÓDULO =========
-            ImportBatch batch = new ImportBatch(canvas.getCircuit());
-
-            // 6) Túneles y cables (por puertos y endpoints)
+            // 6) Túneles + cables cortos (por puertos y endpoints)
             placePortBasedTunnels(
-                    batch, proj, canvas.getCircuit(), mod, elk,
+                    batch, mod,
                     cellHandles, topAnchors, g
             );
 
             // 7) Constantes (drivers reales) usando PortEndpoint/ModulePort
             placeConstantDriversForModule(
-                    batch, proj, canvas.getCircuit(), mod, elk,
+                    batch, proj, mod,
                     cellHandles, topAnchors, g
             );
 
@@ -173,6 +226,146 @@ public final class VerilogJsonImporter {
 
         System.out.println("Total de celdas procesadas: " + totalCells);
         System.out.println("Done.");
+        return mainCirc;
+    }
+
+    private ModuleMaterializer createFileSystemMaterializer() {
+        return new ModuleMaterializer() {
+
+            @Override
+            public boolean ensureModule(Project proj, String moduleName) {
+                // 1) Si el circuito ya existe, no hacemos nada
+                if (findCircuit(proj.getLogisimFile(), moduleName) != null) {
+                    System.out.println("[Materializer] Módulo '" + moduleName + "' ya existe en el proyecto.");
+                    return true;
+                }
+
+                if (baseDir == null) {
+                    System.err.println("[Materializer] No se conoce el directorio base para buscar módulos.");
+                    return false;
+                }
+
+                // 2) Recorre los JSON de la carpeta base buscando el módulo solicitado
+                try (DirectoryStream<Path> ds = Files.newDirectoryStream(baseDir, "*.json")) {
+                    for (Path p : ds) {
+                        try {
+                            JsonNode node = JsonSynthFile.loadAndValidate(p.toFile());
+                            if (node == null) continue;
+
+                            YosysJsonNetlist nl = YosysJsonNetlist.from(node);
+                            // Busca si este netlist contiene el módulo deseado
+                            boolean has = false;
+                            for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) nl.modules()::iterator) {
+                                if (moduleName.equals(dto.name())) { has = true; break; }
+                            }
+                            if (!has) continue;
+
+                            MissingModuleDialog.Choice choice;
+                            if (importAllRemaining) {
+                                choice = MissingModuleDialog.Choice.IMPORT_THIS;
+                            } else {
+                                java.awt.Component parent = (proj.getFrame() != null) ? proj.getFrame() : null;
+                                choice = MissingModuleDialog.ask(parent, moduleName, p);
+                                if (choice == MissingModuleDialog.Choice.IMPORT_ALL) {
+                                    importAllRemaining = true;
+                                    choice = MissingModuleDialog.Choice.IMPORT_THIS;
+                                }
+                            }
+
+                            if (choice == MissingModuleDialog.Choice.SKIP_THIS) {
+                                System.out.println("[Materializer] Usuario decidió NO importar '" + moduleName + "' de " + p.getFileName());
+                                // Sigue buscando otro JSON de la carpeta que pueda contener el mismo módulo
+                                continue;
+                            }
+
+                            System.out.println("[Materializer] Encontrado módulo '" + moduleName + "' en " + p.getFileName());
+                            materializeSingleModule(proj, nl, moduleName);
+                            return (findCircuit(proj.getLogisimFile(), moduleName) != null);
+
+                        } catch (Exception e) {
+                            System.err.println("[Materializer] Fallo al intentar cargar " + p + ": " + e.getMessage());
+                        }
+                    }
+                } catch (IOException io) {
+                    System.err.println("[Materializer] Error leyendo carpeta base: " + io.getMessage());
+                }
+
+                System.err.println("[Materializer] No se encontró el módulo '" + moduleName + "' en " + baseDir);
+                return false;
+            }
+
+            /**
+             * Busca un circuito por nombre dentro del LogisimFile actual.
+             */
+            private Circuit findCircuit(LogisimFile file, String name) {
+                for (Circuit c : file.getCircuits()) {
+                    if (c.getName().equals(name)) return c;
+                }
+                return null;
+            }
+
+            /**
+             * Materializa un módulo específico dentro del proyecto (sin usar chooser).
+             * Reutiliza el pipeline de construcción y layout ya existente.
+             */
+            private void materializeSingleModule(Project proj, YosysJsonNetlist netlist, String moduleName) {
+                for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) netlist.modules()::iterator) {
+                    if (!moduleName.equals(dto.name())) continue;
+
+                    VerilogModuleImpl mod = builder.buildModule(dto);
+                    System.out.println("[Materializer] Materializando submódulo: " + mod.name());
+
+                    // === Build indices ===
+                    ModuleNetIndex netIndex = builder.buildNetIndex(mod);
+                    MemoryIndex memIndex = builder.buildMemoryIndex(mod);
+                    memoryAdapter.beginModule(memIndex, mod);
+
+                    Map<VerilogCell, VerilogCell> cellAlias = buildMemoryCellAlias(mod, memIndex);
+
+                    // === Layout automático con ELK ===
+                    LayoutBuilder.Result elk = LayoutBuilder.build(proj, mod, netIndex, sizer, cellAlias);
+                    LayoutRunner.run(elk.root);
+                    LayoutUtils.applyLayoutAndClamp(elk.root, MIN_X, MIN_Y);
+
+                    // === Crear el nuevo circuito en el proyecto ===
+                    Circuit newCirc = new Circuit(moduleName);
+                    proj.doAction(LogisimFileActions.addCircuit(newCirc));
+                    Canvas canvas = proj.getFrame().getCanvas();
+                    Graphics g = (canvas != null && canvas.getGraphics() != null)
+                            ? canvas.getGraphics()
+                            : new BufferedImage(1,1, BufferedImage.TYPE_INT_ARGB).getGraphics();
+
+                    // === Añadir puertos top ===
+                    Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
+                    Map<ModulePort, PortAnchor> topAnchors = new HashMap<>();
+                    addModulePortsToCircuitSeparated(proj, newCirc, mod, elk, netIndex, g, topAnchors);
+
+                    // === Instanciar celdas ===
+                    for (VerilogCell cell : mod.cells()) {
+                        if (cellAlias.containsKey(cell)) continue;
+                        ElkNode n = elk.cellNode.get(cell);
+                        int x = (n == null) ? MIN_X : (int) Math.round(n.getX());
+                        int y = (n == null) ? MIN_Y : (int) Math.round(n.getY());
+                        InstanceHandle h = adapter.create(proj, newCirc, g, cell, Location.create(x + SEPARATION_INPUT_CELLS, y));
+                        cellHandles.put(cell, h);
+                    }
+
+                    // === Batch de adición segura ===
+                    ImportBatch batch = new ImportBatch(newCirc);
+
+                    // Túneles
+                    placePortBasedTunnels(batch, mod, cellHandles, topAnchors, g);
+
+                    // Constantes
+                    placeConstantDriversForModule(batch, proj, mod, cellHandles, topAnchors, g);
+
+                    batch.commit(proj, "materializeModule");
+
+                    System.out.println("[Materializer] Submódulo '" + moduleName + "' agregado correctamente.");
+                    return;
+                }
+            }
+        };
     }
 
     /* ===================== Helpers ===================== */
@@ -201,8 +394,6 @@ public final class VerilogJsonImporter {
         }
         return alias;
     }
-
-    private static int snap(int v){ return (v/GRID)*GRID; }
 
     /** Crea pins top (inputs a la izquierda, outputs a la derecha) y devuelve anchors (loc+facing). */
     private void addModulePortsToCircuitSeparated(Project proj,
@@ -380,31 +571,6 @@ public final class VerilogJsonImporter {
         }
     }
 
-    /** Etiquetas preferidas: si un netId toca un puerto top, usa ese nombre; si no, N{netId}. */
-    private static Map<Integer,String> buildNetLabels(VerilogModuleImpl mod) {
-        Map<Integer,String> netLabel = new HashMap<>();
-        // 1) Prioriza nombres de puertos top
-        for (int i = 0; i < mod.ports().size(); i++) {
-            ModulePort p = mod.ports().get(i);
-            int[] ids = p.netIds();
-            for (int nid : ids) {
-                if (nid >= 0) netLabel.putIfAbsent(nid, p.name());
-            }
-        }
-        // 2) Fallback por netId vistos en endpoints internos
-        Set<Integer> seen = new HashSet<>(netLabel.keySet());
-        for (VerilogCell c : mod.cells()) {
-            for (PortEndpoint ep : c.endpoints()) {
-                Integer nid = ep.getNetIdOrNull();
-                if (nid != null && !seen.contains(nid)) {
-                    netLabel.put(nid, "N" + nid);
-                    seen.add(nid);
-                }
-            }
-        }
-        return netLabel;
-    }
-
     /** Info de bus agrupada por puerto. */
     private static final class PortBusInfo {
         final int width;
@@ -538,10 +704,7 @@ public final class VerilogJsonImporter {
      *  - siempre un cable corto entre la boca y el túnel (como con constantes)
      */
     private void placePortBasedTunnels(ImportBatch batch,
-                                       Project proj,
-                                       Circuit circuit,
                                        VerilogModuleImpl mod,
-                                       LayoutBuilder.Result elk,
                                        Map<VerilogCell, InstanceHandle> cellHandles,
                                        Map<ModulePort, PortAnchor> topAnchors,
                                        Graphics g) {
@@ -573,7 +736,7 @@ public final class VerilogJsonImporter {
 
             Key k = new Key(kx, ky, label);
             if (placed.add(k)) {
-                createTunnelWithWireNear(batch, proj, g, anc.loc, tunnelWidth, label, facing);
+                createTunnelWithWireNear(batch, anc.loc, tunnelWidth, label, facing);
             }
         }
 
@@ -609,7 +772,7 @@ public final class VerilogJsonImporter {
 
                 Key k = new Key(kx, ky, label);
                 if (placed.add(k)) {
-                    createTunnelWithWireNear(batch, proj, g, pinLoc, tunnelWidth, label, facing);
+                    createTunnelWithWireNear(batch, pinLoc, tunnelWidth, label, facing);
                 }
             }
         }
@@ -617,8 +780,6 @@ public final class VerilogJsonImporter {
 
     // === Helper: crea TÚNEL con un cable corto desde la boca del pin, TODO en batch ===
     private void createTunnelWithWireNear(ImportBatch batch,
-                                          Project proj,
-                                          Graphics g,
                                           Location pinMouthLoc,
                                           int width,
                                           String label,
@@ -667,9 +828,7 @@ public final class VerilogJsonImporter {
      */
     private void placeConstantDriversForModule(ImportBatch batch,
                                                Project proj,
-                                               Circuit circuit,
                                                VerilogModuleImpl mod,
-                                               LayoutBuilder.Result elk,
                                                Map<VerilogCell, InstanceHandle> cellHandles,
                                                Map<ModulePort, PortAnchor> topAnchors,
                                                Graphics g) {
@@ -721,7 +880,7 @@ public final class VerilogJsonImporter {
 
                 if (allPresent && all01) {
                     // === Caso compacto: una sola Constant multibit ===
-                    createConstantDriverNear(batch, proj, circuit, g, pinLoc, width, acc, facing);
+                    createConstantDriverNear(batch, proj, pinLoc, width, acc, facing);
                 } else {
                     // === Mixto: Constant(1) solo para bits 0/1 ===
                     for (int i = 0; i < width; i++) {
@@ -731,8 +890,7 @@ public final class VerilogJsonImporter {
                         if (!"0".equals(k) && !"1".equals(k)) continue;
 
                         int bitVal = "1".equals(k) ? 1 : 0;
-                        Location bitLoc = pinLoc; // misma boca (bus), sirve
-                        createConstantDriverNear(batch, proj, circuit, g, bitLoc, 1, bitVal, facing);
+                        createConstantDriverNear(batch, proj, pinLoc, 1, bitVal, facing);
                     }
                 }
             }
@@ -760,7 +918,7 @@ public final class VerilogJsonImporter {
 
             if (all01) {
                 // Una sola Constant multibit
-                createConstantDriverNear(batch, proj, circuit, g, anchor.loc, width, acc, facing);
+                createConstantDriverNear(batch, proj,anchor.loc, width, acc, facing);
             } else {
                 // Constant(1) solo por bits 0/1
                 for (int i = 0; i < width; i++) {
@@ -771,28 +929,15 @@ public final class VerilogJsonImporter {
                     // Desplaza en Y por bit si quieres evitar apilamiento visual
                     Location bitLoc = Location.create(anchor.loc.getX(),
                             anchor.loc.getY() + i * GRID);
-                    createConstantDriverNear(batch, proj, circuit, g, bitLoc, 1, bitVal, facing);
+                    createConstantDriverNear(batch, proj, bitLoc, 1, bitVal, facing);
                 }
             }
         }
     }
 
-    /** Devuelve "0"/"1" si el BitRef es Const0/Const1; "x"/"z" si lo son; null si no es constante. */
-    private static String constKind(BitRef br) {
-        if (br == null) return null;
-        if (br instanceof Const0) return "0";
-        String n = br.getClass().getSimpleName();
-        if ("Const1".equals(n))   return "1";
-        if ("ConstX".equals(n))   return "x";
-        if ("ConstZ".equals(n))   return "z";
-        return null;
-    }
-
     /** Inserta una constante conectada a la "boca" loc. Crea primero el wire y luego la constante, en BATCH. */
     private void createConstantDriverNear(ImportBatch batch,
                                           Project proj,
-                                          Circuit circuit,
-                                          Graphics g,
                                           Location loc,        // boca del pin/bus destino
                                           int width,           // >=1
                                           int value,           // LSB=bit0
@@ -817,14 +962,8 @@ public final class VerilogJsonImporter {
             if (constF == null) return;
 
             AttributeSet a = constF.createAttributeSet();
-            try {
-                a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width)));
-            } catch (Exception ignore) {
-            }
-            try {
-                a.setValue(StdAttr.FACING, facing);
-            } catch (Exception ignore) {
-            }
+            try { a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width))); } catch (Exception ignore) { }
+            try { a.setValue(StdAttr.FACING, facing); } catch (Exception ignore) { }
 
             // Valor (usa helper tolerante)
             boolean setOk = false;
@@ -854,123 +993,6 @@ public final class VerilogJsonImporter {
 
         } catch (Exception ignore) {
             // Silencioso para no abortar import completo
-        }
-    }
-
-
-    /* ===== utilidades para Constant (copias seguras de tus helpers) ===== */
-
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    private static void setConstantValueFlexible(AttributeSet a, int width, int value) {
-        int mask = (width >= 32) ? -1 : ((1 << Math.max(0, width)) - 1);
-        int masked = value & mask;
-
-        try {
-            Attribute attr = Constant.ATTR_VALUE; // Integer en muchos builds
-            a.setValue(attr, Integer.valueOf(masked));
-            return;
-        } catch (Throwable ignore) { }
-
-        try {
-            Attribute attr = Constant.ATTR_VALUE; // Value en otros builds
-            Value val = Value.createKnown(BitWidth.create(width), masked);
-            a.setValue(attr, val);
-            return;
-        } catch (Throwable ignore) { }
-
-        String hex = "0x" + Integer.toHexString(masked);
-        setParsedByName(a, "value", hex);
-    }
-
-    private static boolean setParsedByName(AttributeSet attrs, String name, String token) {
-        Attribute<?> a = findAttrByName(attrs, name);
-        if (a == null) return false;
-        try {
-            @SuppressWarnings("unchecked")
-            Attribute<Object> ax = (Attribute<Object>) a;
-            Object parsed = ax.parse(token);
-            attrs.setValue(ax, parsed);
-            return true;
-        } catch (Exception ignore) {
-            return false;
-        }
-    }
-
-    private static Attribute<?> findAttrByName(AttributeSet attrs, String name) {
-        for (Attribute<?> a : attrs.getAttributes()) {
-            if (name.equals(a.getName())) return a;
-        }
-        return null;
-    }
-
-    /* =========================
-       Helpers de impresión
-       ========================= */
-
-    private static void printModulePorts(VerilogModuleImpl mod) {
-        if (mod.ports().isEmpty()) {
-            System.out.println("  (sin puertos de módulo)");
-            return;
-        }
-        System.out.println("  Puertos:");
-        for (ModulePort p : mod.ports()) {
-            String bits = Arrays.stream(p.netIds())
-                    .mapToObj(i -> i == ModulePort.CONST_0 ? "0" :
-                            i == ModulePort.CONST_1 ? "1" :
-                                    i == ModulePort.CONST_X ? "x" : String.valueOf(i))
-                    .collect(Collectors.joining(","));
-            System.out.println("    - " + p.name() + " : " + p.direction()
-                    + " [" + p.width() + "]  bits={" + bits + "}");
-        }
-    }
-
-    private static void printNets(VerilogModuleImpl mod, ModuleNetIndex idx) {
-        System.out.println("  Nets:");
-        for (int netId : idx.netIds()) {
-            int[] refs = idx.endpointsOf(netId).stream().mapToInt(i -> i).toArray();
-
-            var topStrs  = new ArrayList<String>();
-            var cellStrs = new ArrayList<String>();
-
-            for (int ref : refs) {
-                int bit = ModuleNetIndex.bitIdx(ref);
-                if (ModuleNetIndex.isTop(ref)) {
-                    int portIdx = ModuleNetIndex.ownerIdx(ref);
-                    ModulePort p = mod.ports().get(portIdx);
-                    topStrs.add(p.name() + "[" + bit + "]");
-                } else {
-                    int cellIdx = ModuleNetIndex.ownerIdx(ref);
-                    VerilogCell c = mod.cells().get(cellIdx);
-                    cellStrs.add(c.name() + "[" + bit + "]");
-                }
-            }
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("    net ").append(netId).append(": ");
-            if (!topStrs.isEmpty())  sb.append("top=").append(topStrs).append(" ");
-            if (!cellStrs.isEmpty()) sb.append("cells=").append(cellStrs);
-            System.out.println(sb);
-        }
-    }
-
-    private static void printMemories(MemoryIndex memIndex) {
-        var all = memIndex.memories();
-        if (all == null || all.isEmpty()) return;
-
-        System.out.println("  Memories:");
-        for (LogicalMemory lm : all) {
-            String meta = (lm.meta() == null)
-                    ? ""
-                    : (" width=" + lm.meta().width()
-                    + " size=" + lm.meta().size()
-                    + " offset=" + lm.meta().startOffset());
-
-            System.out.println("    - MEMID=" + lm.memId()
-                    + " arrayCellIdx=" + (lm.arrayCellIdx() < 0 ? "-" : lm.arrayCellIdx())
-                    + " rdPorts=" + lm.readPortIdxs().size()
-                    + " wrPorts=" + lm.writePortIdxs().size()
-                    + " inits=" + lm.initIdxs().size()
-                    + meta);
         }
     }
 }

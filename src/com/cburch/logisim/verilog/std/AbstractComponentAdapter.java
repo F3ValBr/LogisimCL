@@ -68,7 +68,7 @@ public abstract class AbstractComponentAdapter implements ComponentAdapter {
     /* ===== setters “por nombre” seguros ===== */
 
     /** Busca un atributo por name dentro del AttributeSet. */
-    protected static Attribute<?> findAttrByName(AttributeSet attrs, String name) {
+    public static Attribute<?> findAttrByName(AttributeSet attrs, String name) {
         for (Attribute<?> a : attrs.getAttributes()) {
             if (name.equals(a.getName())) return a;
         }
@@ -76,7 +76,7 @@ public abstract class AbstractComponentAdapter implements ComponentAdapter {
     }
 
     /** Core: parsea y setea usando Attribute.parse(token). Devuelve true si pudo setear. */
-    protected static boolean setParsedByName(AttributeSet attrs, String name, String token) {
+    public static boolean setParsedByName(AttributeSet attrs, String name, String token) {
         Attribute<?> a = findAttrByName(attrs, name);
         if (a == null) return false;
         try {
@@ -91,29 +91,29 @@ public abstract class AbstractComponentAdapter implements ComponentAdapter {
     }
 
     /** Wrappers mínimos y legibles */
-    protected static boolean setBooleanByName(AttributeSet attrs, String name, boolean value) {
+    public static boolean setBooleanByName(AttributeSet attrs, String name, boolean value) {
         return setParsedByName(attrs, name, String.valueOf(value));
     }
 
-    protected static boolean setOptionByName(AttributeSet attrs, String name, String optionName) {
+    public static boolean setOptionByName(AttributeSet attrs, String name, String optionName) {
         // optionName debe ser el “token” que reconoce parse(), p.ej. "asyncReset", "rstActiveHigh", etc.
         return setParsedByName(attrs, name, optionName);
     }
 
-    protected static boolean setStringByName(AttributeSet attrs, String name, String value) {
+    public static boolean setStringByName(AttributeSet attrs, String name, String value) {
         return setParsedByName(attrs, name, value);
     }
 
-    protected static boolean setIntByName(AttributeSet attrs, String name, int value) {
+    public static boolean setIntByName(AttributeSet attrs, String name, int value) {
         return setParsedByName(attrs, name, Integer.toString(value));
     }
 
-    protected static boolean setHexByName(AttributeSet attrs, String name, int value) {
+    public static boolean setHexByName(AttributeSet attrs, String name, int value) {
         return setParsedByName(attrs, name, "0x" + Integer.toHexString(value));
     }
 
     /** Si el token es null/blank, no hace nada (azúcar sintáctico útil). */
-    protected static boolean setParsedIfPresent(AttributeSet attrs, String name, String token) {
+    public static boolean setParsedIfPresent(AttributeSet attrs, String name, String token) {
         if (token == null || token.isBlank()) return false;
         return setParsedByName(attrs, name, token);
     }

@@ -15,20 +15,20 @@ public class YosysComponentsPortMapRegister implements PortMapRegister {
         Library YCLib = lf.getLibrary("Yosys Components");
         if (YCLib == null) return;
 
-        BuiltinPortMaps.registerByName(YCLib.getDisplayName(), "Logical NOT Gate",
+        BuiltinPortMaps.registerByName(YCLib.getName(), "Logical NOT Gate",
                 java.util.Map.of("A", 0, "Y", 1));
-        BuiltinPortMaps.registerByName(YCLib.getDisplayName(), "Logical AND Gate",
+        BuiltinPortMaps.registerByName(YCLib.getName(), "Logical AND Gate",
                 java.util.Map.of("A", 0, "B", 1, "Y", 2));
-        BuiltinPortMaps.registerByName(YCLib.getDisplayName(), "Logical OR Gate",
+        BuiltinPortMaps.registerByName(YCLib.getName(), "Logical OR Gate",
                 java.util.Map.of("A", 0, "B", 1, "Y", 2));
-        BuiltinPortMaps.registerByName(YCLib.getDisplayName(), "Exponent",
+        BuiltinPortMaps.registerByName(YCLib.getName(), "Exponent",
                 java.util.Map.of("A", 0, "Y", 1));
-        BuiltinPortMaps.registerByName(YCLib.getDisplayName(), "Bitwise Multiplexer",
+        BuiltinPortMaps.registerByName(YCLib.getName(), "Bitwise Multiplexer",
                 java.util.Map.of("A", 0, "B", 1, "S", 2, "Y", 3));
-        BuiltinPortMaps.registerByName(YCLib.getDisplayName(), "Binary Multiplexer",
+        BuiltinPortMaps.registerByName(YCLib.getName(), "Binary Multiplexer",
                 java.util.Map.of("A", 0, "AX", 1, "S", 2, "Y", 3));
         BuiltinPortMaps.registerResolverByName(
-                YCLib.getDisplayName(),
+                YCLib.getName(),
                 "Priority Multiplexer",
                 YosysComponentsPortMapRegister::resolvePriMuxPorts
         );

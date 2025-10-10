@@ -16,13 +16,13 @@ public final class MemoryPortMapRegister implements PortMapRegister {
         Library memoryLib = lf.getLibrary("Memory");
         if (memoryLib == null) return;
 
-        BuiltinPortMaps.registerResolverByName(memoryLib.getDisplayName(), "Register",
+        BuiltinPortMaps.registerResolverByName(memoryLib.getName(), "Register",
                 MemoryPortMapRegister::resolveRegisterPorts);
-        BuiltinPortMaps.registerByName(memoryLib.getDisplayName(), "RAM",
+        BuiltinPortMaps.registerByName(memoryLib.getName(), "RAM",
                 Map.of("addr", 1, "dataIn", 2, "dataOut", 0, "we", 3, "clk", 4));
-        BuiltinPortMaps.registerByName(memoryLib.getDisplayName(), "ROM",
+        BuiltinPortMaps.registerByName(memoryLib.getName(), "ROM",
                 Map.of("addr", 1, "dataOut", 0, "clk", 2));
-        BuiltinPortMaps.registerByName(memoryLib.getDisplayName(), "S-R Flip-Flop",
+        BuiltinPortMaps.registerByName(memoryLib.getName(), "S-R Flip-Flop",
                 Map.of("countOut", 0, "enable", 1, "load", 2, "clear", 3, "loadValue", 4, "clk", 5));
     }
 

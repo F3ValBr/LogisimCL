@@ -21,24 +21,24 @@ public final class BuiltinPortMaps {
     private static final Map<String, Map<String,Integer>> BY_NAME = new HashMap<>();
     private static final Map<String, PortIndexResolver>   RESOLVER_BY_NAME = new HashMap<>();
 
-    private static String keyOf(String libName, String compDisplayName) {
-        return (libName == null ? "" : libName) + "::" + (compDisplayName == null ? "" : compDisplayName);
+    private static String keyOf(String libName, String componentName) {
+        return (libName == null ? "" : libName) + "::" + (componentName == null ? "" : componentName);
     }
 
     // ===== API de registro =====
-    public static void registerByName(String libName, String compDisplayName,
+    public static void registerByName(String libName, String componentName,
                                       Map<String,Integer> nameToOrdinal) {
-        BY_NAME.put(keyOf(libName, compDisplayName), Map.copyOf(nameToOrdinal));
+        BY_NAME.put(keyOf(libName, componentName), Map.copyOf(nameToOrdinal));
     }
 
-    public static void registerResolverByName(String libName, String compDisplayName,
+    public static void registerResolverByName(String libName, String componentName,
                                               PortIndexResolver resolver) {
-        RESOLVER_BY_NAME.put(keyOf(libName, compDisplayName), resolver);
+        RESOLVER_BY_NAME.put(keyOf(libName, componentName), resolver);
     }
 
     public static Map<String,Integer> forFactory(Library lib, ComponentFactory f, Component instanceOrNull) {
-        String key = keyOf(lib != null ? lib.getDisplayName() : "",
-                f   != null ? f.getDisplayGetter().get() : "");
+        String key = keyOf(lib != null ? lib.getName() : "",
+                f   != null ? f.getName() : "");
         PortIndexResolver dyn = RESOLVER_BY_NAME.get(key);
         if (dyn != null && instanceOrNull != null) return dyn.resolve(instanceOrNull);
         return BY_NAME.getOrDefault(key, Map.of());

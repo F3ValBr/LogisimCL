@@ -11,9 +11,9 @@ public class PlexersPortMapRegister implements PortMapRegister {
         Library plexersLib = lf.getLibrary("Plexers");
         if (plexersLib == null) return;
 
-        BuiltinPortMaps.registerByName(plexersLib.getDisplayName(), "Multiplexer",
+        BuiltinPortMaps.registerByName(plexersLib.getName(), "Multiplexer",
                 java.util.Map.of("A", 0, "B", 1, "S", 2, "Y", 3));
-        BuiltinPortMaps.registerByName(plexersLib.getDisplayName(), "Demultiplexer",
+        BuiltinPortMaps.registerByName(plexersLib.getName(), "Demultiplexer",
                 java.util.Map.of("A", 0, "S", 1, "Y", 2));
     }
 }

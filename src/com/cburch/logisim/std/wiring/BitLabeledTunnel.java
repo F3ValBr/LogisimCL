@@ -1,0 +1,430 @@
+package com.cburch.logisim.std.wiring;
+
+import com.cburch.logisim.circuit.Circuit;
+import com.cburch.logisim.comp.TextField;
+import com.cburch.logisim.data.*;
+import com.cburch.logisim.instance.*;
+import com.cburch.logisim.proj.Project;
+import com.cburch.logisim.tools.key.BitWidthConfigurator;
+import com.cburch.logisim.util.GraphicsUtil;
+
+import java.awt.Color;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.lang.ref.WeakReference;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static com.cburch.logisim.data.Direction.*;
+
+/**
+ * BitLabeledTunnel (Logisim 2.7.1)
+ * - Puerto multibit único (INPUT u OUTPUT según atributo).
+ * - Por dentro, cada bit se mapea a "0", "1", "x" o un label (String).
+ * - Los labels se conectan por un backplane lógico compartido por Circuit.
+ * Atributos:
+ *  - StdAttr.WIDTH
+ *  - StdAttr.LABEL
+ *  - StdAttr.FACING
+ *  - BitLabeledTunnel.BIT_SPECS (String CSV)
+ *  - BitLabeledTunnel.ATTR_OUTPUT (Boolean)
+ */
+public class BitLabeledTunnel extends InstanceFactory {
+
+    public static final BitLabeledTunnel FACTORY = new BitLabeledTunnel();
+
+    // Atributos nuevos
+    public static final Attribute<String> BIT_SPECS =
+            Attributes.forString("bitSpecs", Strings.getter("bitSpecsAttr"));
+    public static final Attribute<Boolean> ATTR_OUTPUT =
+            Attributes.forBoolean("output", Strings.getter("outputAttr"));
+
+    // Geometría estilo Tunnel
+    static final int MARGIN = 3;
+    static final int ARROW_MIN_WIDTH = 16;
+
+    public BitLabeledTunnel() {
+        super("BitLabeledTunnel", Strings.getter("BLTunnelComponent"));
+        setIconName("bltunnel.gif");
+        setFacingAttribute(StdAttr.FACING);
+        setKeyConfigurator(new BitWidthConfigurator(StdAttr.WIDTH));
+    }
+
+    @Override
+    public AttributeSet createAttributeSet() {
+        BitLabeledTunnelAttributes at = new BitLabeledTunnelAttributes();
+        at.setValue(StdAttr.WIDTH, BitWidth.create(1));
+        at.setValue(StdAttr.LABEL, "");
+        at.setValue(StdAttr.FACING, WEST);
+        at.setValue(BIT_SPECS, "");
+        at.setValue(ATTR_OUTPUT, Boolean.FALSE);
+        return at;
+    }
+
+    /* ==================== Pintado ==================== */
+
+    @Override
+    public Bounds getOffsetBounds(AttributeSet attrsBase) {
+        TunnelAttributes attrs = (TunnelAttributes) attrsBase;
+        Bounds bds = attrs.getOffsetBounds();
+        if (bds != null) return bds;
+
+        int ht = attrs.getFont().getSize();
+        int wd = ht * attrs.getLabel().length() / 2;
+        bds = computeBounds(attrs, wd, ht, null, attrs.getLabel());
+        attrs.setOffsetBounds(bds);
+        return bds;
+    }
+
+    @Override
+    public void paintGhost(InstancePainter painter) {
+        TunnelAttributes attrs = (TunnelAttributes) painter.getAttributeSet();
+        Direction facing = attrs.getFacing();
+        String label = attrs.getLabel();
+
+        Graphics g = painter.getGraphics();
+        g.setFont(attrs.getFont());
+        FontMetrics fm = g.getFontMetrics();
+
+        // bounds basados en el texto
+        Bounds bds = computeBounds(attrs, fm.stringWidth(label),
+                fm.getAscent() + fm.getDescent(), g, label);
+        if (attrs.setOffsetBounds(bds)) {
+            Instance inst = painter.getInstance();
+            if (inst != null) inst.recomputeBounds();
+        }
+
+        final int x0 = bds.getX();
+        final int y0 = bds.getY();
+        final int w  = bds.getWidth();
+        final int h  = bds.getHeight();
+
+        // Geometría
+        int headDepth  = Math.max(10, (int)Math.round(h * 0.30));
+        int notchDepth = -Math.max(8,  (int)Math.round(h * 0.30));
+
+        // Limitar para que no se crucen
+        int maxHead = Math.max(8, w - Math.abs(notchDepth) - 10);
+        if (headDepth > maxHead) headDepth = maxHead;
+
+        int[] xp, yp;
+        int L = x0; // Left
+        int T = y0; // Top
+        int R = x0 + w; // Right
+        int B = y0 + h; // Bottom
+
+        if (facing.equals(EAST)) {
+            int M = (T + B) / 2;
+
+            xp = new int[] {L + notchDepth, R - headDepth, R, R - headDepth, L + notchDepth, L};
+            yp = new int[] {T, T, M, B, B, M};
+        } else if (facing.equals(WEST)) {
+            int M = (T + B) / 2;
+
+            xp = new int[] {R - notchDepth, L + headDepth, L, L + headDepth, R - notchDepth, R};
+            yp = new int[] {T, T, M, B, B, M};
+        } else if (facing.equals(NORTH)) {
+            int M = (L + R) / 2;
+
+            xp = new int[] {L, L, M, R, R, (L + R) / 2};
+            yp = new int[] {B - notchDepth, T + headDepth, T, T + headDepth, B - notchDepth, B};
+        } else {
+            int M = (L + R) / 2;
+
+            xp = new int[] {L, L, M, R, R, (L + R) / 2};
+            yp = new int[] {T + notchDepth, B - headDepth, B, B - headDepth, T + notchDepth, T};
+        }
+
+        // === Recalcular bounds según el polígono (para que la selección lo cubra) ===
+        int minX = xp[0], maxX = xp[0], minY = yp[0], maxY = yp[0];
+        for (int i = 1; i < xp.length; i++) {
+            if (xp[i] < minX) minX = xp[i];
+            if (xp[i] > maxX) maxX = xp[i];
+            if (yp[i] < minY) minY = yp[i];
+            if (yp[i] > maxY) maxY = yp[i];
+        }
+        Bounds polyB = Bounds.create(minX, minY, maxX - minX, maxY - minY).expand(MARGIN).add(0, 0);
+
+        // Si cambió, avisa a Logisim y usa el nuevo
+        if (attrs.setOffsetBounds(polyB)) {
+            Instance inst = painter.getInstance();
+            if (inst != null) inst.recomputeBounds();
+        }
+
+        // Colores diferenciados por modo (opcional)
+        boolean isOutput = Boolean.TRUE.equals(attrs.getValue(BitLabeledTunnel.ATTR_OUTPUT));
+        Color border = isOutput ? Color.BLUE.darker() : Color.GREEN.darker();
+
+        g.setColor(border);
+        GraphicsUtil.switchToWidth(g, 2);
+        g.drawPolygon(xp, yp, xp.length);
+    }
+
+
+    @Override
+    public void paintInstance(InstancePainter painter) {
+        Location loc = painter.getLocation();
+        int x = loc.getX();
+        int y = loc.getY();
+        Graphics g = painter.getGraphics();
+
+        // --- Dibujo del túnel (con translate local) ---
+        g.translate(x, y);
+        g.setColor(Color.BLACK);
+        paintGhost(painter);
+        g.translate(-x, -y);
+
+        // --- Puertos (API de painter los dibuja en coords globales) ---
+        painter.drawPorts();
+
+        // --- Overlay de error: constantes en modo INPUT ---
+        AttributeSet atts = painter.getAttributeSet();
+        BitWidth bw = atts.getValue(StdAttr.WIDTH);
+        int w = Math.max(1, bw.getWidth());
+
+        String csv = atts.getValue(BIT_SPECS);
+        java.util.List<String> specsVis = parseSpecs(csv == null ? "" : csv, w);
+
+        boolean isOutput = Boolean.TRUE.equals(atts.getValue(ATTR_OUTPUT));
+        boolean hasConst = false;
+        for (String s : specsVis) {
+            if ("0".equals(s) || "1".equals(s)) { hasConst = true; break; }
+        }
+
+        if (!isOutput && hasConst) {
+            // Bounds del túnel están en coords locales; convertimos a absolutas sumando (x,y)
+            Bounds b = getOffsetBounds(atts);
+            int ex = x + b.getX() - 7; // un poco más grande y visible
+            int ey = y + b.getY() - 7;
+
+            // Dibujamos un punto rojo con "!" encima
+            Color old = g.getColor();
+            g.setColor(Color.RED);
+            g.fillOval(ex, ey, 14, 14);
+            g.setColor(Color.WHITE);
+            g.drawString("!", ex + 4, ey + 12);
+            g.setColor(old);
+        }
+    }
+
+    /* ============== Configuración de instancia/atributos ============== */
+
+    private static void configureLabel(Instance instance) {
+        TunnelAttributes attrs = (TunnelAttributes) instance.getAttributeSet();
+        Location loc = instance.getLocation();
+        instance.setTextField(StdAttr.LABEL, StdAttr.LABEL_FONT,
+                loc.getX() + attrs.getLabelX(), loc.getY() + attrs.getLabelY(),
+                attrs.getLabelHAlign(), attrs.getLabelVAlign());
+    }
+
+    private static void reconfigurePorts(Instance instance) {
+        boolean out = Boolean.TRUE.equals(instance.getAttributeSet().getValue(ATTR_OUTPUT));
+        String kind = out ? Port.OUTPUT : Port.INPUT; // ✅ tipo correcto
+        instance.setPorts(new Port[] { new Port(0, 0, kind, StdAttr.WIDTH) });
+    }
+
+    @Override
+    protected void configureNewInstance(Instance instance) {
+        instance.addAttributeListener();
+        reconfigurePorts(instance);
+        configureLabel(instance);
+    }
+
+    @Override
+    protected void instanceAttributeChanged(Instance instance, Attribute<?> attr) {
+        if (attr == StdAttr.FACING) {
+            configureLabel(instance);
+            instance.recomputeBounds();
+        } else if (attr == StdAttr.LABEL || attr == StdAttr.LABEL_FONT) {
+            instance.recomputeBounds();
+        } else if (attr == StdAttr.WIDTH || attr == BIT_SPECS || attr == ATTR_OUTPUT) {
+            reconfigurePorts(instance);
+            instance.fireInvalidated(); // forzar re-propagación
+        }
+    }
+
+    /* ===================== Simulación ===================== */
+
+    @Override
+    public void propagate(InstanceState state) {
+        BitWidth bw = state.getAttributeValue(StdAttr.WIDTH);
+        int w = Math.max(1, bw.getWidth());
+        boolean outputMode = Boolean.TRUE.equals(state.getAttributeValue(ATTR_OUTPUT));
+
+        List<String> specs = parseSpecs(state.getAttributeValue(BIT_SPECS), w);
+        Backplane bp = backplaneOf(state);
+        Instance inst = state.getInstance();
+
+        Value bus = state.getPort(0);
+        int nodeW = (bus != null) ? bus.getWidth() : w;
+
+        if (!outputMode) {
+            // ===== INPUT: publica y NO conduce
+            if (bus == null || bus.getWidth() != w) bus = Value.createUnknown(bw);
+
+            for (int i = 0; i < w; i++) {
+                String si = specs.get(i);
+                if (isConst0(si) || isConst1(si) || isX(si)) continue;
+                if (nodeW != w) {
+                    bp.publish(si, Value.UNKNOWN); // no conduce
+                } else {
+                    bp.publish(si, bus.get(i)); // notifica a suscriptores
+                }
+            }
+
+            // si antes era OUTPUT y dejó de usar labels, limpia suscripciones
+            bp.unsubscribeAll(inst);
+
+        } else {
+            // ===== OUTPUT: (re)subscribir y construir salida
+            // 1) (Re)subscribir este Instance a todos los labels que usa
+            bp.unsubscribeAll(inst);
+            for (String label : labelsFromSpecs(specs)) {
+                bp.subscribe(label, inst);
+            }
+
+            // 2) Construir el bus de salida
+            Value[] bits = new Value[w];
+            for (int i = 0; i < w; i++) {
+                String si = specs.get(i);
+                if (isConst0(si)) bits[i] = Value.FALSE;
+                else if (isConst1(si)) bits[i] = Value.TRUE;
+                else if (isX(si)) bits[i] = Value.UNKNOWN;
+                else {
+                    Value v = bp.get(si);
+                    bits[i] = (v != null) ? v : Value.UNKNOWN;
+                }
+            }
+            if (nodeW != w) {
+                BitWidth nbw = BitWidth.create(Math.max(1, nodeW));
+                state.setPort(0, Value.createUnknown(nbw), 1);
+            } else {
+                state.setPort(0, Value.create(bits), 1);
+            }
+        }
+    }
+
+
+    /* ============== Backplane por circuito con suscripciones ============== */
+    private static final WeakHashMap<Circuit, Backplane> PLANES
+            = new WeakHashMap<>();
+
+    private static Backplane backplaneOf(InstanceState s) {
+        Project p = s.getProject();
+        // Más robusto: toma el Circuit desde el CircuitState del Project si existe;
+        // si no, cae a getCurrentCircuit()
+        Circuit c = (p.getCircuitState() != null)
+                ? p.getCircuitState().getCircuit()
+                : p.getCurrentCircuit();
+
+        synchronized (PLANES) {
+            Backplane bp = PLANES.get(c);
+            if (bp == null) {
+                bp = new Backplane();
+                PLANES.put(c, bp);
+            }
+            return bp;
+        }
+    }
+
+    private static final class Backplane {
+        final Map<String, Value> values = new ConcurrentHashMap<>();
+        final Map<String, Set<WeakReference<Instance>>> subs =
+                new ConcurrentHashMap<>();
+
+        Value get(String k) { return values.get(k); }
+
+        void subscribe(String label, Instance inst) {
+            subs.computeIfAbsent(label, kk -> Collections.newSetFromMap(
+                            new ConcurrentHashMap<WeakReference<Instance>, Boolean>()))
+                    .add(new WeakReference<>(inst));
+        }
+
+        void unsubscribeAll(Instance inst) {
+            for (Set<WeakReference<Instance>> set : subs.values()) {
+                set.removeIf(ref -> {
+                    Instance x = ref.get();
+                    return x == null || x == inst;
+                });
+            }
+        }
+
+        void publish(String label, Value v) {
+            Value old = values.put(label, v);
+            if (old == null || !old.equals(v)) {
+                Set<java.lang.ref.WeakReference<Instance>> set = subs.get(label);
+                if (set != null) {
+                    for (java.lang.ref.WeakReference<Instance> ref : set) {
+                        Instance in = ref.get();
+                        if (in != null) in.fireInvalidated(); // “despierta” OUTPUTs
+                    }
+                }
+            }
+        }
+    }
+
+
+    private static List<String> labelsFromSpecs(List<String> specs) {
+        List<String> out = new ArrayList<>();
+        for (String s : specs) {
+            if (!isX(s) && !isConst0(s) && !isConst1(s)) out.add(s);
+        }
+        return out;
+    }
+
+    /* ==================== Helpers de dibujo ==================== */
+
+    private Bounds computeBounds(TunnelAttributes attrs, int textWidth,
+                                 int textHeight, Graphics g, String label) {
+        int x = attrs.getLabelX();
+        int y = attrs.getLabelY();
+        int halign = attrs.getLabelHAlign();
+        int valign = attrs.getLabelVAlign();
+
+        int minDim = ARROW_MIN_WIDTH - 2 * MARGIN;
+        int bw = Math.max(minDim, textWidth);
+        int bh = Math.max(minDim, textHeight);
+        int bx;
+        int by;
+        bx = switch (halign) {
+            case TextField.H_LEFT -> x;
+            case TextField.H_RIGHT -> x - bw;
+            default -> x - (bw / 2);
+        };
+        by = switch (valign) {
+            case TextField.V_TOP -> y;
+            case TextField.V_BOTTOM -> y - bh;
+            default -> y - (bh / 2);
+        };
+
+        if (g != null) {
+            GraphicsUtil.drawText(g, label, bx + bw / 2, by + bh / 2,
+                    GraphicsUtil.H_CENTER, GraphicsUtil.V_CENTER_OVERALL);
+        }
+
+        return Bounds.create(bx, by, bw, bh).expand(MARGIN).add(0, 0);
+    }
+
+
+    /* ==================== Helpers CSV/constantes ==================== */
+
+    private static List<String> parseSpecs(String csv, int width) {
+        List<String> out = new ArrayList<>(width);
+        if (csv == null || csv.trim().isEmpty()) {
+            for (int i = 0; i < width; i++) out.add("x");
+            return out;
+        }
+        String[] toks = csv.split(",");
+        for (String t : toks) out.add(t.trim());
+        if (out.size() < width) {
+            while (out.size() < width) out.add("x");
+        } else if (out.size() > width) {
+            out = out.subList(0, width);
+        }
+        return out;
+    }
+
+    private static boolean isConst0(String s){ return "0".equals(s); }
+    private static boolean isConst1(String s){ return "1".equals(s); }
+    private static boolean isX(String s){ return s == null || s.isEmpty() || "x".equalsIgnoreCase(s); }
+}

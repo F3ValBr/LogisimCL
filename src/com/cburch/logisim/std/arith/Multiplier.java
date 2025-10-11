@@ -40,7 +40,7 @@ public class Multiplier extends InstanceFactory {
 
         setAttributes(
                 new Attribute[]{ StdAttr.WIDTH, SIGN_MODE },
-                new Object[]   { BitWidth.create(8), MODE_AUTO }
+                new Object[]   { BitWidth.create(8), MODE_UNSIGNED }
         );
         setKeyConfigurator(new BitWidthConfigurator(StdAttr.WIDTH));
         setOffsetBounds(Bounds.create(-40, -20, 40, 40));

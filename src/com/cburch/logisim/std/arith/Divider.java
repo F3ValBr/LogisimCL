@@ -49,7 +49,7 @@ public class Divider extends InstanceFactory {
         super("Divider", Strings.getter("dividerComponent"));
         setAttributes(
                 new Attribute[] { StdAttr.WIDTH, SIGN_MODE, DIV_MODE },
-                new Object[]   { BitWidth.create(8), MODE_AUTO, DIV_TRUNC });
+                new Object[]   { BitWidth.create(8), MODE_UNSIGNED, DIV_TRUNC });
         setKeyConfigurator(new BitWidthConfigurator(StdAttr.WIDTH));
         setOffsetBounds(Bounds.create(-40, -20, 40, 40));
         setIconName("divider.gif");

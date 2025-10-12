@@ -19,10 +19,11 @@ import com.cburch.logisim.std.memory.MemoryPortMapRegister;
 import com.cburch.logisim.std.plexers.PlexersPortMapRegister;
 import com.cburch.logisim.std.wiring.Constant;
 import com.cburch.logisim.std.wiring.Pin;
-import com.cburch.logisim.std.wiring.Tunnel;
 import com.cburch.logisim.std.yosys.YosysComponentsPortMapRegister;
 import com.cburch.logisim.verilog.comp.CellFactoryRegistry;
 import com.cburch.logisim.verilog.comp.auxiliary.*;
+import com.cburch.logisim.verilog.comp.auxiliary.netconn.BitRef;
+import com.cburch.logisim.verilog.comp.auxiliary.netconn.Const0;
 import com.cburch.logisim.verilog.comp.auxiliary.netconn.PortDirection;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleBuilder;
@@ -50,7 +51,6 @@ import com.cburch.logisim.verilog.std.adapters.wordlvl.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.eclipse.elk.graph.ElkNode;
 
-import javax.swing.*;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -186,7 +186,7 @@ public final class VerilogJsonImporter {
             // 3) Colocar pins top en el circuito del módulo y guardar anchors
             Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
             Map<ModulePort, PortAnchor>      topAnchors  = new HashMap<>();
-            addModulePortsToCircuitSeparated(proj, target, mod, elk, netIndex, g, topAnchors);
+            addModulePortsToCircuitSeparated(proj, target, mod, elk, g, topAnchors);
 
             // 4) Instanciar sólo celdas no-aliased en el circuito del módulo
             for (int i = 0; i < mod.cells().size(); i++) {
@@ -218,7 +218,7 @@ public final class VerilogJsonImporter {
                     cellHandles, topAnchors, g
             );
 
-            // 8) Commit único del módulo (evita ConcurrentModification)
+            // 8) Commit único del módulo
             batch.commit(proj, "addComponentsFromImport");
 
             System.out.println();
@@ -338,7 +338,7 @@ public final class VerilogJsonImporter {
                     // === Añadir puertos top ===
                     Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
                     Map<ModulePort, PortAnchor> topAnchors = new HashMap<>();
-                    addModulePortsToCircuitSeparated(proj, newCirc, mod, elk, netIndex, g, topAnchors);
+                    addModulePortsToCircuitSeparated(proj, newCirc, mod, elk, g, topAnchors);
 
                     // === Instanciar celdas ===
                     for (VerilogCell cell : mod.cells()) {
@@ -400,7 +400,6 @@ public final class VerilogJsonImporter {
                                                   Circuit circuit,
                                                   VerilogModuleImpl mod,
                                                   LayoutBuilder.Result elk,
-                                                  ModuleNetIndex netIdx,
                                                   Graphics g,
                                                   Map<ModulePort, PortAnchor> topAnchors) {
         // 1) Caja envolvente de las celdas del módulo
@@ -460,7 +459,7 @@ public final class VerilogJsonImporter {
             }
         }
 
-        // ---- Outputs (derecha, WEST) — MISMO CRITERIO UNIFORME ----
+        // ---- Outputs (derecha, WEST) ----
         int outStep = Math.max(GRID, spanY / Math.max(1, outputs.size() + 1));
         int curOutY = minY + outStep;
         for (ModulePort p : outputs) {
@@ -472,6 +471,7 @@ public final class VerilogJsonImporter {
             attrs.setValue(Pin.ATTR_TRISTATE, false);
             attrs.setValue(StdAttr.FACING, WEST);
             attrs.setValue(StdAttr.LABEL, p.name());
+            attrs.setValue(Pin.ATTR_LABEL_LOC, EAST);
 
             Location loc = Location.create(snap(xOutputs), snap(curOutY));
             curOutY += outStep;
@@ -511,126 +511,14 @@ public final class VerilogJsonImporter {
         return comp;
     }
 
-    private static void queueWire(ImportBatch batch, Location a, Location b) {
-        batch.add(Wire.create(a, b));
-    }
-
     /* ===================== Túneles con endpoints ===================== */
 
-    /** Punto de conexión (coordenada y orientación) */
-    private static final class PortAnchor {
-        final Location loc;
-        final Direction facing;
-        PortAnchor(Location loc, Direction facing) {
-            this.loc = loc; this.facing = facing;
-        }
-    }
-
-    /** Info de bus agrupada por puerto. */
-    private static final class PortBusInfo {
-        final int width;
-        final int minNet;
-        final int maxNet;
-        final SortedSet<Integer> nets;   // únicos ordenados (para min/max)
-        final SortedSet<Integer> bits;   // índices de bit presentes
-        final List<Integer> netsOrdered; // NUEVO: orden original de aparición
-
-        PortBusInfo(int width, int minNet, int maxNet,
-                    SortedSet<Integer> nets,
-                    SortedSet<Integer> bits,
-                    List<Integer> netsOrdered) {
-            this.width = width; this.minNet = minNet; this.maxNet = maxNet;
-            this.nets = nets; this.bits = bits; this.netsOrdered = netsOrdered;
-        }
-    }
-
-    /** Calcula (width, minNet, maxNet, ...) para un puerto de CELDA usando PortEndpoint, preservando orden. */
-    private static Optional<PortBusInfo> computeCellPortBusInfo(VerilogCell cell, String portName) {
-        List<Integer> netsOrdered = new ArrayList<>();
-        SortedSet<Integer> netsSorted = new TreeSet<>();
-        SortedSet<Integer> bits = new TreeSet<>();
-
-        for (PortEndpoint ep : cell.endpoints()) {
-            if (!portName.equals(ep.getPortName())) continue;
-            Integer nid = ep.getNetIdOrNull(); // null si es constante
-            if (nid == null) continue;
-            if (netsOrdered.isEmpty() || !netsOrdered.get(netsOrdered.size()-1).equals(nid)) {
-                // respeta orden de aparición; evita duplicados contiguos
-                netsOrdered.add(nid);
-            }
-            netsSorted.add(nid);
-            bits.add(ep.getBitIndex());
-        }
-        if (netsOrdered.isEmpty()) return Optional.empty();
-
-        return Optional.of(new PortBusInfo(
-                netsOrdered.size(),
-                netsSorted.first(),
-                netsSorted.last(),
-                netsSorted,
-                bits,
-                netsOrdered
-        ));
-    }
-
-    /** Calcula (width, minNet, maxNet, ...) para un puerto TOP usando netIds(), preservando orden. */
-    private static Optional<PortBusInfo> computeTopPortBusInfo(ModulePort p) {
-        List<Integer> netsOrdered = new ArrayList<>();
-        SortedSet<Integer> netsSorted = new TreeSet<>();
-        SortedSet<Integer> bits = new TreeSet<>();
-
-        int[] arr = p.netIds();
-        for (int i = 0; i < arr.length; i++) {
-            int nid = arr[i];
-            if (nid >= 0) {
-                netsOrdered.add(nid);  // orden original de aparición
-                netsSorted.add(nid);
-                bits.add(i);
-            }
-        }
-        if (netsOrdered.isEmpty()) return Optional.empty();
-
-        return Optional.of(new PortBusInfo(
-                netsOrdered.size(),
-                netsSorted.first(),
-                netsSorted.last(),
-                netsSorted,
-                bits,
-                netsOrdered
-        ));
-    }
-
-    /** Genera etiqueta “N…” preservando orden y agrupando tramos contiguos (p. ej. N24-25;13). */
-    private static String makeNetSetLabel(List<Integer> netsOrdered) {
-        if (netsOrdered == null || netsOrdered.isEmpty()) return "N?";
-        List<int[]> ranges = contiguousRanges(netsOrdered);
-        StringBuilder sb = new StringBuilder("N");
-        for (int i = 0; i < ranges.size(); i++) {
-            int[] r = ranges.get(i);
-            if (i > 0) sb.append(';');
-            if (r[0] == r[1]) sb.append(r[0]);
-            else sb.append(r[0]).append('-').append(r[1]);
-        }
-        return sb.toString();
-    }
-
-    /** Compacta la lista preservando orden en tramos contiguos. */
-    private static List<int[]> contiguousRanges(List<Integer> ordered) {
-        List<int[]> out = new ArrayList<>();
-        if (ordered.isEmpty()) return out;
-        int start = ordered.get(0), prev = start;
-        for (int i = 1; i < ordered.size(); i++) {
-            int cur = ordered.get(i);
-            if (cur == prev + 1) {
-                prev = cur;
-            } else {
-                out.add(new int[]{start, prev});
-                start = prev = cur;
-            }
-        }
-        out.add(new int[]{start, prev});
-        return out;
-    }
+    /**
+     * Punto de conexión (coordenada y orientación)
+     * @param loc coordenadas del pin o endpoint
+     * @param facing orientación del pin o facingByNearestBorder()
+     */
+        private record PortAnchor(Location loc, Direction facing) { }
 
     /** Heurística N/E/S/W según borde más cercano (idéntica a tu versión). */
     private static Direction facingByNearestBorder(Bounds cb, Location pinLoc) {
@@ -664,112 +552,166 @@ public final class VerilogJsonImporter {
                                        Map<ModulePort, PortAnchor> topAnchors,
                                        Graphics g) {
 
-        // evita duplicados exactos (posición real del túnel y label)
-        record Key(int x, int y, String label) {}
+        record Key(int x, int y, String label, boolean out) {}
         Set<Key> placed = new HashSet<>();
 
-        // 1) TOP ports
+        // === TOP ports ===
         for (ModulePort p : mod.ports()) {
             PortAnchor anc = topAnchors.get(p);
             if (anc == null) continue;
 
-            var infoOpt = computeTopPortBusInfo(p);
-            if (infoOpt.isEmpty()) continue;
-            PortBusInfo info = infoOpt.get();
+            // Construir bitSpecs (LSB..MSB)
+            List<String> specs = buildBitSpecsForTopPort(p);
 
-            // etiqueta preservando orden
-            String label = makeNetSetLabel(info.netsOrdered);
-            int tunnelWidth = Math.max(1, Math.min(p.width(), info.width));
+            boolean all01 = specs.stream().allMatch(s -> "0".equals(s) || "1".equals(s));
+            if (all01) {
+                // no crear túnel y dejar que fase de constantes lo materialice
+                continue;
+            }
 
-            // El túnel debe mirar “hacia afuera”: invertimos respecto del pin
-            Direction facing = (anc.facing == EAST) ? WEST : EAST;
+            // Modo del túnel:
+            // - TOP INPUT → INPUT mode → ATTR_OUTPUT=false
+            // - TOP OUTPUT → OUTPUT mode → ATTR_OUTPUT=true
+            boolean attrOutput = (p.direction() == PortDirection.OUTPUT);
 
-            // Posición real del túnel (un paso de grilla fuera del pin)
-            int step = GRID;
-            int kx = anc.loc.getX() + (facing == EAST ?  step : -step);
+            Direction facing = (anc.facing == Direction.EAST) ? Direction.WEST : Direction.EAST;
+
+            String pretty = makeLabelForSpecs(specs); // sólo estética
+            int step = 10;
+            int kx = anc.loc.getX() + (facing == Direction.EAST ?  step : -step);
             int ky = anc.loc.getY();
 
-            Key k = new Key(kx, ky, label);
+            Key k = new Key(kx, ky, pretty, attrOutput);
             if (placed.add(k)) {
-                createTunnelWithWireNear(batch, anc.loc, tunnelWidth, label, facing);
+                createBLTunnelWithWireNear(batch, anc.loc,
+                        Math.max(1, p.width()), specs, pretty, facing, attrOutput);
             }
         }
 
-        // 2) Celdas internas: un túnel por puerto de cada celda
+        // === Celdas internas ===
         for (Map.Entry<VerilogCell, InstanceHandle> e : cellHandles.entrySet()) {
             VerilogCell cell = e.getKey();
             InstanceHandle ih = e.getValue();
             if (ih == null || ih.ports == null) continue;
 
             for (String portName : cell.getPortNames()) {
-                var infoOpt = computeCellPortBusInfo(cell, portName);
-                if (infoOpt.isEmpty()) continue;
-                PortBusInfo info = infoOpt.get();
+                int declWidth = Math.max(1, cell.portWidth(portName));
+
+                // Const-only
+                PortEndpoint[] byIdx = new PortEndpoint[declWidth];
+                for (PortEndpoint ep : cell.endpoints()) {
+                    if (!portName.equals(ep.getPortName())) continue;
+                    int i = ep.getBitIndex();
+                    if (i >= 0 && i < declWidth) byIdx[i] = ep;
+                }
+                ConstAnalysis ca = analyzeConstBits(byIdx);
+                if (ca.allPresent && ca.all01) {
+                    continue; // habrá Constant; no túnel
+                }
 
                 Location pinLoc = ih.ports.locateByName(portName);
                 if (pinLoc == null) continue;
 
-                int declWidth = Math.max(1, cell.portWidth(portName));
-                int tunnelWidth = Math.max(1, Math.min(declWidth, info.width));
+                // Specs por bit
+                List<String> specs = buildBitSpecsForCellPort(cell, portName);
+                String pretty = makeLabelForSpecs(specs);
 
-                // etiqueta preservando orden
-                String label = makeNetSetLabel(info.netsOrdered);
+                // Dirección de puerto (INPUT/OUTPUT/INOUT) para decidir ATTR_OUTPUT
+                Dir d = dirForPort(cell, portName);
+                // - Celda OUTPUT → túnel en INPUT → ATTR_OUTPUT=false
+                // - Celda INPUT  → túnel en OUTPUT → ATTR_OUTPUT=true
+                boolean attrOutput = (d == Dir.IN); // si el puerto de la celda es entrada, el túnel debe salir (OUTPUT mode)
 
-                // Facing por borde más cercano
                 Direction facing = facingByNearestBorder(ih.component.getBounds(g), pinLoc);
 
-                // Posición real del túnel (un paso de grilla fuera del borde)
-                int step = GRID;
-                int kx = pinLoc.getX() + (facing == EAST ?  step :
-                        facing == WEST ? -step : 0);
-                int ky = pinLoc.getY() + (facing == SOUTH ?  step :
-                        facing == NORTH ? -step : 0);
+                int step = 10;
+                int kx = pinLoc.getX() + (facing == Direction.EAST ?  step :
+                        facing == Direction.WEST ? -step : 0);
+                int ky = pinLoc.getY() + (facing == Direction.SOUTH ?  step :
+                        facing == Direction.NORTH ? -step : 0);
 
-                Key k = new Key(kx, ky, label);
+                Key k = new Key(kx, ky, pretty, attrOutput);
                 if (placed.add(k)) {
-                    createTunnelWithWireNear(batch, pinLoc, tunnelWidth, label, facing);
+                    createBLTunnelWithWireNear(batch, pinLoc,
+                            declWidth, specs, pretty, facing, attrOutput);
                 }
             }
         }
     }
 
-    // === Helper: crea TÚNEL con un cable corto desde la boca del pin, TODO en batch ===
-    private void createTunnelWithWireNear(ImportBatch batch,
-                                          Location pinMouthLoc,
-                                          int width,
-                                          String label,
-                                          Direction facing) {
+    /**
+     * Crea un BitLabeledTunnel con un cable corto entre la boca y el túnel.
+     * @param batch batch de importación
+     * @param pinMouthLoc coordenadas del pin o endpoint
+     * @param width anchura en bits del túnel (≥1)
+     * @param bitSpecs especificaciones de bits (LSB..MSB), p. ej. ["0","1","N","Z","3-7"]
+     * @param prettyLabel etiqueta estética (p. ej. "N24-25;13"), o null/blank para no poner
+     * @param facing orientación del túnel (N/E/S/W)
+     * @param attrOutput true si el túnel debe estar en modo OUTPUT (sólo salida), false si INPUT (sólo entrada)
+     */
+    private void createBLTunnelWithWireNear(ImportBatch batch,
+                                            Location pinMouthLoc,
+                                            int width,
+                                            List<String> bitSpecs,  // LSB..MSB
+                                            String prettyLabel,     // para StdAttr.LABEL
+                                            Direction facing,
+                                            boolean attrOutput) {
         final int step = GRID;
         int dx = 0, dy = 0;
-        if (facing == EAST)       dx = -step;
-        else if (facing == WEST)  dx =  step;
-        else if (facing == NORTH) dy =  step;
-        else if (facing == SOUTH) dy = -step;
+        if (facing == Direction.EAST)      dx = -step;
+        else if (facing == Direction.WEST) dx =  step;
+        else if (facing == Direction.NORTH)dy =  step;
+        else if (facing == Direction.SOUTH)dy = -step;
 
         final Location kLoc = Location.create(pinMouthLoc.getX() + dx, pinMouthLoc.getY() + dy);
 
-        // 1) Encola wire primero
-        queueWire(batch, pinMouthLoc, kLoc);
+        // 1) Wire primero
+        batch.add(Wire.create(kLoc, pinMouthLoc));
 
-        // 2) Túnel en kLoc (ajustando offset de pin si aplica)
-        AttributeSet a = Tunnel.FACTORY.createAttributeSet();
+        // 2) Atributos del BitLabeledTunnel
+        AttributeSet a = com.cburch.logisim.std.wiring.BitLabeledTunnel.FACTORY.createAttributeSet();
         a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width)));
-        a.setValue(StdAttr.LABEL, label);
+        a.setValue(com.cburch.logisim.std.wiring.BitLabeledTunnel.BIT_SPECS, String.join(",", bitSpecs));
+        a.setValue(com.cburch.logisim.std.wiring.BitLabeledTunnel.ATTR_OUTPUT, Boolean.valueOf(attrOutput && (facing != Direction.WEST)));
         a.setValue(StdAttr.FACING, facing);
+        if (prettyLabel != null && !prettyLabel.isBlank()) {
+            a.setValue(StdAttr.LABEL, prettyLabel);
+        }
 
-        // 3) Coloca el túnel para que su pin caiga en kLoc (ajusta offset)
-        Component probe = Tunnel.FACTORY.createComponent(Location.create(0, 0), a);
-        EndData end0    = probe.getEnd(0);
+        // 3) Calcular offset para que su pin “caiga” en kLoc
+        Component probe = com.cburch.logisim.std.wiring.BitLabeledTunnel.FACTORY.createComponent(Location.create(0, 0), a);
+        EndData end0 = probe.getEnd(0);
         int offX = end0.getLocation().getX() - probe.getLocation().getX();
         int offY = end0.getLocation().getY() - probe.getLocation().getY();
-        Location tunnelLoc = Location.create(kLoc.getX() - offX, kLoc.getY() - offY);
+        Location tunLoc = Location.create(kLoc.getX() - offX, kLoc.getY() - offY);
 
-        // 4) Encola el túnel
-        try {
-            batch.add(Tunnel.FACTORY.createComponent(tunnelLoc, a));
-        } catch (Throwable ex) {
-            System.err.println("No se pudo encolar túnel '" + label + "': " + ex.getMessage());
+        // 4) Encolar el componente
+        batch.add(com.cburch.logisim.std.wiring.BitLabeledTunnel.FACTORY.createComponent(tunLoc, a));
+    }
+
+
+    /** Dirección lógica de un puerto dentro de un VerilogCell. */
+    private enum Dir { IN, OUT, INOUT }
+
+    /** Determina si un puerto actúa como entrada, salida o bidireccional. */
+    private static Dir dirForPort(VerilogCell cell, String portName) {
+        List<PortEndpoint> eps = cell.endpoints()
+                .stream()
+                .filter(ep -> portName.equals(ep.getPortName()))
+                .toList();
+
+        boolean seenIn = false, seenOut = false;
+        for (PortEndpoint ep : eps) {
+            switch (ep.getDirection()) {
+                case INPUT  -> seenIn = true;
+                case OUTPUT -> seenOut = true;
+                case INOUT  -> { return Dir.INOUT; }
+                default     -> { /* ignore */ }
+            }
         }
+        if (seenIn && seenOut) return Dir.INOUT;
+        if (seenOut) return Dir.OUT;
+        return Dir.IN; // por defecto, si solo hay entradas o desconocido
     }
 
     /* ===================== CONSTANTES: drivers reales ===================== */
@@ -792,62 +734,33 @@ public final class VerilogJsonImporter {
             InstanceHandle ih = cellHandles.get(cell);
             if (ih == null || ih.ports == null) continue;
 
-            // Agrupa endpoints por nombre de puerto → lista ordenada por bitIndex
+            // Agrupa endpoints por puerto
             Map<String, List<PortEndpoint>> byPort = new LinkedHashMap<>();
             for (PortEndpoint ep : cell.endpoints()) {
                 byPort.computeIfAbsent(ep.getPortName(), __ -> new ArrayList<>()).add(ep);
             }
+
             for (var e : byPort.entrySet()) {
                 String pName = e.getKey();
-                List<PortEndpoint> eps = e.getValue();
                 int width = Math.max(1, cell.portWidth(pName));
                 if (width <= 0) continue;
 
-                // Normaliza a array por índice (si faltan, los marca null)
+                // Normalizar por índice de bit
                 PortEndpoint[] byIdx = new PortEndpoint[width];
-                for (PortEndpoint ep : eps) {
+                for (PortEndpoint ep : e.getValue()) {
                     int i = ep.getBitIndex();
                     if (i >= 0 && i < width) byIdx[i] = ep;
                 }
 
-                // ¿todos los bits presentes y 0/1?
-                boolean allPresent = true, all01 = true;
-                int acc = 0; // LSB = bitIndex 0
-                for (int i = 0; i < width; i++) {
-                    PortEndpoint ep = byIdx[i];
-                    if (ep == null) { allPresent = false; all01 = false; break; }
-                    String k = constKind(ep.getBitRef());
-                    if (k == null) { all01 = false; }
-                    else if (k.equals("0") || k.equals("1")) {
-                        if (k.equals("1")) acc |= (1 << i);
-                    } else {
-                        // x/z → no podemos generar Constant que los represente
-                        all01 = false;
-                    }
-                }
+                // Sólo constante si TODOS son 0/1
+                ConstAnalysis ca = analyzeConstBits(byIdx);
+                if (!(ca.allPresent && ca.all01)) continue; // NO crear nada para mixtos o nets
 
-                // Boca del pin
                 Location pinLoc = ih.ports.locateByName(pName);
                 if (pinLoc == null) continue;
 
-                // Facing por borde más cercano
                 Direction facing = facingByNearestBorder(ih.component.getBounds(g), pinLoc);
-
-                if (allPresent && all01) {
-                    // === Caso compacto: una sola Constant multibit ===
-                    createConstantDriverNear(batch, proj, pinLoc, width, acc, facing);
-                } else {
-                    // === Mixto: Constant(1) solo para bits 0/1 ===
-                    for (int i = 0; i < width; i++) {
-                        PortEndpoint ep = byIdx[i];
-                        if (ep == null) continue;
-                        String k = constKind(ep.getBitRef());
-                        if (!"0".equals(k) && !"1".equals(k)) continue;
-
-                        int bitVal = "1".equals(k) ? 1 : 0;
-                        createConstantDriverNear(batch, proj, pinLoc, 1, bitVal, facing);
-                    }
-                }
+                createConstantDriverNear(batch, proj, pinLoc, width, ca.acc, facing);
             }
         }
 
@@ -855,40 +768,31 @@ public final class VerilogJsonImporter {
         for (ModulePort p : mod.ports()) {
             PortAnchor anchor = topAnchors.get(p);
             if (anchor == null) continue;
+
             int width = Math.max(1, p.width());
             int[] ids = p.netIds();
             if (ids == null || ids.length != width) continue;
 
             boolean all01 = true;
-            int acc = 0; // LSB = índice 0
+            int acc = 0; // LSB..MSB
             for (int i = 0; i < width; i++) {
                 int id = ids[i];
-                if (id == ModulePort.CONST_0) { /* 0 */ }
-                else if (id == ModulePort.CONST_1) { acc |= (1 << i); }
-                else { all01 = false; } // incluye X/Z/Net
-            }
-
-            // Invertimos facing como ya hacías para top pins
-            Direction facing = (anchor.facing == EAST) ? WEST : EAST;
-
-            if (all01) {
-                // Una sola Constant multibit
-                createConstantDriverNear(batch, proj,anchor.loc, width, acc, facing);
-            } else {
-                // Constant(1) solo por bits 0/1
-                for (int i = 0; i < width; i++) {
-                    int id = ids[i];
-                    if (id != ModulePort.CONST_0 && id != ModulePort.CONST_1) continue;
-                    int bitVal = (id == ModulePort.CONST_1) ? 1 : 0;
-
-                    // Desplaza en Y por bit si quieres evitar apilamiento visual
-                    Location bitLoc = Location.create(anchor.loc.getX(),
-                            anchor.loc.getY() + i * GRID);
-                    createConstantDriverNear(batch, proj, bitLoc, 1, bitVal, facing);
+                if (id == ModulePort.CONST_0) {
+                    // 0
+                } else if (id == ModulePort.CONST_1) {
+                    acc |= (1 << i);
+                } else {
+                    all01 = false; break;
                 }
             }
+
+            if (!all01) continue; // NO crear nada cuando hay mezcla o nets
+
+            Direction facing = (anchor.facing == EAST) ? WEST : EAST;
+            createConstantDriverNear(batch, proj, anchor.loc, width, acc, facing);
         }
     }
+
 
     /** Inserta una constante conectada a la "boca" loc. Crea primero el wire y luego la constante, en BATCH. */
     private void createConstantDriverNear(ImportBatch batch,
@@ -898,7 +802,7 @@ public final class VerilogJsonImporter {
                                           int value,           // LSB=bit0
                                           Direction facing) {
         try {
-            final int step = GRID; // típicamente 10
+            final int step = GRID;
 
             // 1) Punto kLoc un grid "hacia atrás" respecto al facing del pin/túnel
             int dx = 0, dy = 0;
@@ -948,5 +852,111 @@ public final class VerilogJsonImporter {
         } catch (Exception ignore) {
             // Silencioso para no abortar import completo
         }
+    }
+
+    // Devuelve CSV LSB..MSB con "0","1","x" o "N<id>"
+    private static List<String> buildBitSpecsForCellPort(VerilogCell cell, String portName) {
+        int w = Math.max(1, cell.portWidth(portName));
+        PortEndpoint[] byIdx = new PortEndpoint[w];
+        for (PortEndpoint ep : cell.endpoints()) {
+            if (!portName.equals(ep.getPortName())) continue;
+            int i = ep.getBitIndex();
+            if (i >= 0 && i < w) byIdx[i] = ep;
+        }
+        List<String> specs = new ArrayList<>(w);
+        for (int i = 0; i < w; i++) {
+            PortEndpoint ep = byIdx[i];
+            if (ep == null) { specs.add("x"); continue; }
+            BitRef br = ep.getBitRef();
+            if (br instanceof Const0) { specs.add("0"); continue; }
+            String n = (br == null) ? "" : br.getClass().getSimpleName();
+            if ("Const1".equals(n)) { specs.add("1"); continue; }
+            if ("ConstX".equals(n) || "ConstZ".equals(n)) { specs.add("x"); continue; }
+
+            // Net
+            Integer nid = ep.getNetIdOrNull();
+            specs.add(nid == null ? "x" : ("N" + nid));
+        }
+        return specs;
+    }
+
+    // Para puertos TOP usando netIds() (enteros o constantes especiales)
+    private static List<String> buildBitSpecsForTopPort(ModulePort p) {
+        int w = Math.max(1, p.width());
+        int[] arr = p.netIds();
+        List<String> specs = new ArrayList<>(w);
+        for (int i = 0; i < w; i++) {
+            int nid = (i < arr.length) ? arr[i] : ModulePort.CONST_X;
+            if (nid == ModulePort.CONST_0)      specs.add("0");
+            else if (nid == ModulePort.CONST_1) specs.add("1");
+            else if (nid == ModulePort.CONST_X) specs.add("x");
+            else specs.add("N" + nid);
+        }
+        return specs;
+    }
+
+    // Compacta etiqueta visible tipo N4-6;9 (no se usa en lógica, sólo estética)
+    private static String makeLabelForSpecs(List<String> specs) {
+        List<Integer> netsOrdered = new ArrayList<>();
+        for (String s : specs) if (s.startsWith("N")) {
+            try { netsOrdered.add(Integer.parseInt(s.substring(1))); } catch (Exception ignore) {}
+        }
+        if (netsOrdered.isEmpty()) return ""; // todo constantes → sin label visible
+        List<int[]> ranges = contiguousRanges(netsOrdered);
+        StringBuilder sb = new StringBuilder("N");
+        for (int i = 0; i < ranges.size(); i++) {
+            int[] r = ranges.get(i);
+            if (i > 0) sb.append(';');
+            if (r[0] == r[1]) sb.append(r[0]);
+            else sb.append(r[0]).append('-').append(r[1]);
+        }
+        return sb.toString();
+    }
+
+    private static List<int[]> contiguousRanges(List<Integer> ordered) {
+        List<int[]> out = new ArrayList<>();
+        if (ordered.isEmpty()) return out;
+        int start = ordered.get(0), prev = start;
+        for (int i = 1; i < ordered.size(); i++) {
+            int cur = ordered.get(i);
+            if (cur == prev + 1) prev = cur; else {
+                out.add(new int[]{start, prev});
+                start = prev = cur;
+            }
+        }
+        out.add(new int[]{start, prev});
+        return out;
+    }
+
+    /**
+     * Resultado del análisis de bits de un puerto.
+     * @param allPresent true si todos los bits del puerto están conectados a algo
+     * @param all01 true si todos los bits son 0/1 (no hay X/Z/Net)
+     * @param acc LSB..MSB (solo válido si all01 == true)
+     */
+    private record ConstAnalysis(boolean allPresent, boolean all01, int acc) { }
+
+    private static ConstAnalysis analyzeConstBits(PortEndpoint[] byIdx) {
+        boolean allPresent = true, all01 = true;
+        int acc = 0;
+        for (int i = 0; i < byIdx.length; i++) {
+            PortEndpoint ep = byIdx[i];
+            if (ep == null) { allPresent = false; all01 = false; break; }
+            BitRef br = ep.getBitRef();
+            if (br instanceof Const0) {
+                // 0 -> no set
+            } else {
+                String n = (br == null) ? "" : br.getClass().getSimpleName();
+                if ("Const1".equals(n)) {
+                    acc |= (1 << i);
+                } else if ("ConstX".equals(n) || "ConstZ".equals(n)) {
+                    all01 = false;
+                } else {
+                    // Net → no es 0/1
+                    all01 = false;
+                }
+            }
+        }
+        return new ConstAnalysis(allPresent, all01, acc);
     }
 }

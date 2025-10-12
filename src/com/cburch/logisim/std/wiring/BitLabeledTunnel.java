@@ -1,19 +1,15 @@
 package com.cburch.logisim.std.wiring;
 
-import com.cburch.logisim.circuit.Circuit;
 import com.cburch.logisim.comp.TextField;
 import com.cburch.logisim.data.*;
 import com.cburch.logisim.instance.*;
-import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.tools.key.BitWidthConfigurator;
 import com.cburch.logisim.util.GraphicsUtil;
 
 import java.awt.Color;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
-import java.lang.ref.WeakReference;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static com.cburch.logisim.data.Direction.*;
 
@@ -151,7 +147,7 @@ public class BitLabeledTunnel extends InstanceFactory {
             if (inst != null) inst.recomputeBounds();
         }
 
-        // Colores diferenciados por modo (opcional)
+        // Colores diferenciados por modo OUTPUT/INPUT
         boolean isOutput = Boolean.TRUE.equals(attrs.getValue(BitLabeledTunnel.ATTR_OUTPUT));
         Color border = isOutput ? Color.BLUE.darker() : Color.GREEN.darker();
 
@@ -239,7 +235,7 @@ public class BitLabeledTunnel extends InstanceFactory {
             instance.recomputeBounds();
         } else if (attr == StdAttr.WIDTH || attr == BIT_SPECS || attr == ATTR_OUTPUT) {
             reconfigurePorts(instance);
-            instance.fireInvalidated(); // forzar re-propagación
+            instance.fireInvalidated();
         }
     }
 
@@ -247,129 +243,8 @@ public class BitLabeledTunnel extends InstanceFactory {
 
     @Override
     public void propagate(InstanceState state) {
-        BitWidth bw = state.getAttributeValue(StdAttr.WIDTH);
-        int w = Math.max(1, bw.getWidth());
-        boolean outputMode = Boolean.TRUE.equals(state.getAttributeValue(ATTR_OUTPUT));
-
-        List<String> specs = parseSpecs(state.getAttributeValue(BIT_SPECS), w);
-        Backplane bp = backplaneOf(state);
-        Instance inst = state.getInstance();
-
-        Value bus = state.getPort(0);
-        int nodeW = (bus != null) ? bus.getWidth() : w;
-
-        if (!outputMode) {
-            // ===== INPUT: publica y NO conduce
-            if (bus == null || bus.getWidth() != w) bus = Value.createUnknown(bw);
-
-            for (int i = 0; i < w; i++) {
-                String si = specs.get(i);
-                if (isConst0(si) || isConst1(si) || isX(si)) continue;
-                if (nodeW != w) {
-                    bp.publish(si, Value.UNKNOWN); // no conduce
-                } else {
-                    bp.publish(si, bus.get(i)); // notifica a suscriptores
-                }
-            }
-
-            // si antes era OUTPUT y dejó de usar labels, limpia suscripciones
-            bp.unsubscribeAll(inst);
-
-        } else {
-            // ===== OUTPUT: (re)subscribir y construir salida
-            // 1) (Re)subscribir este Instance a todos los labels que usa
-            bp.unsubscribeAll(inst);
-            for (String label : labelsFromSpecs(specs)) {
-                bp.subscribe(label, inst);
-            }
-
-            // 2) Construir el bus de salida
-            Value[] bits = new Value[w];
-            for (int i = 0; i < w; i++) {
-                String si = specs.get(i);
-                if (isConst0(si)) bits[i] = Value.FALSE;
-                else if (isConst1(si)) bits[i] = Value.TRUE;
-                else if (isX(si)) bits[i] = Value.UNKNOWN;
-                else {
-                    Value v = bp.get(si);
-                    bits[i] = (v != null) ? v : Value.UNKNOWN;
-                }
-            }
-            if (nodeW != w) {
-                BitWidth nbw = BitWidth.create(Math.max(1, nodeW));
-                state.setPort(0, Value.createUnknown(nbw), 1);
-            } else {
-                state.setPort(0, Value.create(bits), 1);
-            }
-        }
-    }
-
-
-    /* ============== Backplane por circuito con suscripciones ============== */
-    private static final WeakHashMap<Circuit, Backplane> PLANES
-            = new WeakHashMap<>();
-
-    private static Backplane backplaneOf(InstanceState s) {
-        Project p = s.getProject();
-        // Más robusto: toma el Circuit desde el CircuitState del Project si existe;
-        // si no, cae a getCurrentCircuit()
-        Circuit c = (p.getCircuitState() != null)
-                ? p.getCircuitState().getCircuit()
-                : p.getCurrentCircuit();
-
-        synchronized (PLANES) {
-            Backplane bp = PLANES.get(c);
-            if (bp == null) {
-                bp = new Backplane();
-                PLANES.put(c, bp);
-            }
-            return bp;
-        }
-    }
-
-    private static final class Backplane {
-        final Map<String, Value> values = new ConcurrentHashMap<>();
-        final Map<String, Set<WeakReference<Instance>>> subs =
-                new ConcurrentHashMap<>();
-
-        Value get(String k) { return values.get(k); }
-
-        void subscribe(String label, Instance inst) {
-            subs.computeIfAbsent(label, kk -> Collections.newSetFromMap(
-                            new ConcurrentHashMap<WeakReference<Instance>, Boolean>()))
-                    .add(new WeakReference<>(inst));
-        }
-
-        void unsubscribeAll(Instance inst) {
-            for (Set<WeakReference<Instance>> set : subs.values()) {
-                set.removeIf(ref -> {
-                    Instance x = ref.get();
-                    return x == null || x == inst;
-                });
-            }
-        }
-
-        void publish(String label, Value v) {
-            Value old = values.put(label, v);
-            if (old == null || !old.equals(v)) {
-                Set<java.lang.ref.WeakReference<Instance>> set = subs.get(label);
-                if (set != null) {
-                    for (java.lang.ref.WeakReference<Instance> ref : set) {
-                        Instance in = ref.get();
-                        if (in != null) in.fireInvalidated(); // “despierta” OUTPUTs
-                    }
-                }
-            }
-        }
-    }
-
-
-    private static List<String> labelsFromSpecs(List<String> specs) {
-        List<String> out = new ArrayList<>();
-        for (String s : specs) {
-            if (!isX(s) && !isConst0(s) && !isConst1(s)) out.add(s);
-        }
-        return out;
+        // Los hilos ya fueron unidos por CircuitWires.connectBitLabeledTunnels
+        // No conducir manualmente para evitar lazos.
     }
 
     /* ==================== Helpers de dibujo ==================== */
@@ -423,8 +298,4 @@ public class BitLabeledTunnel extends InstanceFactory {
         }
         return out;
     }
-
-    private static boolean isConst0(String s){ return "0".equals(s); }
-    private static boolean isConst1(String s){ return "1".equals(s); }
-    private static boolean isX(String s){ return s == null || s.isEmpty() || "x".equalsIgnoreCase(s); }
 }

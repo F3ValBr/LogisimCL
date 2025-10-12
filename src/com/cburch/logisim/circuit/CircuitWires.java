@@ -16,15 +16,10 @@ import java.util.Set;
 import com.cburch.logisim.comp.Component;
 import com.cburch.logisim.comp.ComponentDrawContext;
 import com.cburch.logisim.comp.EndData;
-import com.cburch.logisim.data.Attribute;
-import com.cburch.logisim.data.AttributeEvent;
-import com.cburch.logisim.data.AttributeListener;
-import com.cburch.logisim.data.BitWidth;
-import com.cburch.logisim.data.Bounds;
-import com.cburch.logisim.data.Location;
-import com.cburch.logisim.data.Value;
+import com.cburch.logisim.data.*;
 import com.cburch.logisim.instance.Instance;
 import com.cburch.logisim.instance.StdAttr;
+import com.cburch.logisim.std.wiring.BitLabeledTunnel;
 import com.cburch.logisim.std.wiring.PullResistor;
 import com.cburch.logisim.std.wiring.Tunnel;
 import com.cburch.logisim.util.GraphicsUtil;
@@ -73,6 +68,13 @@ class CircuitWires {
 			if (attr == StdAttr.LABEL || attr == PullResistor.ATTR_PULL_TYPE) {
 				voidBundleMap();
 			}
+            // BitLabeledTunnel: si cambia label, width, bitSpecs o modo output → recomputar
+            if (attr == StdAttr.WIDTH
+                    || attr == BitLabeledTunnel.BIT_SPECS
+                    || attr == BitLabeledTunnel.ATTR_OUTPUT
+                    || attr == StdAttr.FACING) {
+                voidBundleMap();
+            }
 		}
 	}
 
@@ -146,7 +148,8 @@ class CircuitWires {
 	// user-given data
 	private HashSet<Wire> wires = new HashSet<Wire>();
 	private HashSet<Splitter> splitters = new HashSet<Splitter>();
-	private HashSet<Component> tunnels = new HashSet<Component>(); // of Components with Tunnel factory
+    private final HashSet<Component> bitTunnels = new HashSet<>(); // componentes con BitLabeledTunnel factory
+    private HashSet<Component> tunnels = new HashSet<Component>(); // of Components with Tunnel factory
 	private TunnelListener tunnelListener = new TunnelListener();
 	private HashSet<Component> pulls = new HashSet<Component>(); // of Components with PullResistor factory
 	final CircuitPoints points = new CircuitPoints();
@@ -245,7 +248,10 @@ class CircuitWires {
 			} else if (factory instanceof PullResistor) {
 				pulls.add(comp);
 				comp.getAttributeSet().addAttributeListener(tunnelListener);
-			}
+			} else if (factory instanceof BitLabeledTunnel) {
+                bitTunnels.add(comp);
+                comp.getAttributeSet().addAttributeListener(tunnelListener);
+            }
 		}
 		if (added) {
 			points.add(comp);
@@ -267,7 +273,10 @@ class CircuitWires {
 			} else if (factory instanceof PullResistor) {
 				pulls.remove(comp);
 				comp.getAttributeSet().removeAttributeListener(tunnelListener);
-			}
+			} else if (factory instanceof BitLabeledTunnel) {
+                bitTunnels.add(comp);
+                comp.getAttributeSet().addAttributeListener(tunnelListener);
+            }
 		}
 		points.remove(comp);
 		voidBundleMap();
@@ -612,6 +621,8 @@ class CircuitWires {
 			}
 		}
 
+        connectBitLabeledTunnels(ret);
+
 		// unite threads going through splitters
 		for (Splitter spl : splitters) {
 			synchronized(spl) {
@@ -802,4 +813,90 @@ class CircuitWires {
 		bounds = bds;
 		return bds;
 	}
+
+    // === Helpers BLT ===
+    // genera una ubicación pseudo-única (fuera de rango normal) por etiqueta
+    private static Location pseudoLocForLabel(String label) {
+        int h = (label == null ? 0 : label.hashCode());
+        // espacio negativo para no chocar con el lienzo
+        int x = Integer.MIN_VALUE / 2 + (h & 0x7FFF);
+        int y = Integer.MIN_VALUE / 2 + ((h >>> 16) & 0x7FFF);
+        return Location.create(x, y);
+    }
+
+    /** Cose por bits todos los BitLabeledTunnel: cada token no-const crea/usa un bundle de 1 bit por etiqueta
+     *  y une el hilo i del bundle del BLT con el hilo 0 del bundle de etiqueta. */
+    private void connectBitLabeledTunnels(BundleMap ret) {
+        if (bitTunnels.isEmpty()) return;
+
+        HashMap<String, WireBundle> labelBundles = new HashMap<>();
+
+        for (Component comp : bitTunnels) {
+            EndData end = comp.getEnd(0);
+            if (end == null) continue;
+            Location loc = end.getLocation();
+            WireBundle bltBundle = ret.getBundleAt(loc);
+            if (bltBundle == null) bltBundle = ret.createBundleAt(loc);
+
+            BitWidth w = end.getWidth();
+            if (w == null || w == BitWidth.UNKNOWN) continue;
+            int width = Math.max(1, w.getWidth());
+            bltBundle.setWidth(w, loc);
+
+            AttributeSet a = comp.getAttributeSet();
+            String csv = "";
+            try {
+                String s = a.getValue(BitLabeledTunnel.BIT_SPECS);
+                if (s != null) csv = s;
+            } catch (Throwable ignore) { }
+
+            String[] toks = csv.split(",");
+            String[] specs = new String[width];
+            for (int i = 0; i < width; i++) {
+                if (i < toks.length) specs[i] = toks[i].trim();
+                else specs[i] = "x";
+            }
+
+            WireThread[] bt = bltBundle.threads;
+            if (!bltBundle.isValid() || bt == null || bt.length < width) continue;
+
+            for (int i = 0; i < width; i++) {
+                String lab = specs[i];
+                if (lab == null || lab.isBlank()) continue;
+
+                // --- 1️⃣ Si es constante, fija el hilo directamente ---
+                switch (lab) {
+                    case "0":
+                        bltBundle.addPullValue(Value.FALSE);
+                        continue;
+                    case "1":
+                        bltBundle.addPullValue(Value.TRUE);
+                        continue;
+                    case "x":
+                    case "X":
+                        bltBundle.addPullValue(Value.UNKNOWN);
+                        continue;
+                }
+
+                // --- 2️⃣ Si es etiqueta normal, une con bundle compartido ---
+                WireBundle lb = labelBundles.get(lab);
+                if (lb == null) {
+                    Location pseudo = pseudoLocForLabel(lab);
+                    lb = ret.getBundleAt(pseudo);
+                    if (lb == null) {
+                        lb = ret.createBundleAt(pseudo);
+                        lb.setWidth(BitWidth.ONE, pseudo);
+                    }
+                    labelBundles.put(lab, lb);
+                }
+
+                WireThread[] lbt = lb.threads;
+                if (!lb.isValid() || lbt == null || lbt.length < 1) continue;
+
+                try {
+                    bt[i].unite(lbt[0]);
+                } catch (Throwable ignore) {}
+            }
+        }
+    }
 }

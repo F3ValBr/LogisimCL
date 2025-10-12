@@ -64,9 +64,9 @@ public final class BuiltinPortMaps {
 
         int yIdx;
         switch (out) {
+            case GT -> yIdx = m.getOrDefault("GT", 2);
             case EQ -> yIdx = m.getOrDefault("EQ", 3);
-            case LT -> yIdx = m.getOrDefault("GT", 2);
-            case GT -> yIdx = m.getOrDefault("LT", 4);
+            case LT -> yIdx = m.getOrDefault("LT", 4);
             default -> yIdx = m.getOrDefault("EQ", 3);
         }
         m.put("Y", yIdx); // alias lógico para cablear “Y” del JSON al pin correcto

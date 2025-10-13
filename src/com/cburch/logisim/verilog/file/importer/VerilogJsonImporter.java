@@ -9,7 +9,6 @@ import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.comp.EndData;
 import com.cburch.logisim.data.*;
 import com.cburch.logisim.file.LogisimFile;
-import com.cburch.logisim.file.LogisimFileActions;
 import com.cburch.logisim.gui.main.Canvas;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.proj.Project;
@@ -64,6 +63,7 @@ import static com.cburch.logisim.data.Direction.*;
 import static com.cburch.logisim.verilog.file.importer.ImporterUtils.*;
 import static com.cburch.logisim.verilog.file.ui.WarningCollector.showDetailsDialog;
 import static com.cburch.logisim.verilog.std.AbstractComponentAdapter.setParsedByName;
+import static com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter.circuitHasAnyComponent;
 
 public final class VerilogJsonImporter {
 
@@ -355,18 +355,31 @@ public final class VerilogJsonImporter {
                     LayoutRunner.run(elk.root);
                     LayoutUtils.applyLayoutAndClamp(elk.root, MIN_X, MIN_Y);
 
-                    // === Crear el nuevo circuito en el proyecto ===
-                    Circuit newCirc = new Circuit(moduleName);
-                    proj.doAction(LogisimFileActions.addCircuit(newCirc));
-                    Canvas canvas = proj.getFrame().getCanvas();
-                    Graphics g = (canvas != null && canvas.getGraphics() != null)
-                            ? canvas.getGraphics()
-                            : new BufferedImage(1,1, BufferedImage.TYPE_INT_ARGB).getGraphics();
+                    // === Obtener/crear el circuito destino con manejo de conflicto de nombre ===
+                    Circuit target = ensureCircuit(proj, moduleName);
+                    if (target == null) {
+                        System.out.println("[Materializer] Usuario canceló materializar '" + moduleName + "'.");
+                        return;
+                    }
+                    if (circuitHasAnyComponent(target)) {
+                        System.out.println("[Materializer] Circuito '" + moduleName + "' no está vacío; no se sobrescribe (posible cancel).");
+                        return;
+                    }
+
+                    Graphics g;
+                    try {
+                        Canvas canvas = (proj.getFrame() != null) ? proj.getFrame().getCanvas() : null;
+                        g = (canvas != null && canvas.getGraphics() != null)
+                                ? canvas.getGraphics()
+                                : new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).getGraphics();
+                    } catch (Throwable t) {
+                        g = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).getGraphics();
+                    }
 
                     // === Añadir puertos top ===
                     Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
                     Map<ModulePort, PortAnchor> topAnchors = new HashMap<>();
-                    addModulePortsToCircuitSeparated(proj, newCirc, mod, elk, g, topAnchors);
+                    addModulePortsToCircuitSeparated(proj, target, mod, elk, g, topAnchors);
 
                     // === Instanciar celdas ===
                     for (VerilogCell cell : mod.cells()) {
@@ -374,12 +387,12 @@ public final class VerilogJsonImporter {
                         ElkNode n = elk.cellNode.get(cell);
                         int x = (n == null) ? snap(MIN_X) : snap((int) Math.round(n.getX()));
                         int y = (n == null) ? snap(MIN_Y) : snap((int) Math.round(n.getY()));
-                        InstanceHandle h = adapter.create(proj, newCirc, g, cell, Location.create(x + SEPARATION_INPUT_CELLS, y));
+                        InstanceHandle h = adapter.create(proj, target, g, cell, Location.create(x + SEPARATION_INPUT_CELLS, y));
                         cellHandles.put(cell, h);
                     }
 
                     // === Batch de adición segura ===
-                    ImportBatch batch = new ImportBatch(newCirc);
+                    ImportBatch batch = new ImportBatch(target);
 
                     // Túneles
                     placePortBasedTunnels(batch, mod, cellHandles, topAnchors, g);

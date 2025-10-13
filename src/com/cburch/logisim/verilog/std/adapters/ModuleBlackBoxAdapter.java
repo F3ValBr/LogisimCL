@@ -191,7 +191,7 @@ public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
     }
 
     /** Verificador de componentes dentro de un circuito dado */
-    private static boolean circuitHasAnyComponent(Circuit c) {
+    public static boolean circuitHasAnyComponent(Circuit c) {
         try {
             var f = Circuit.class.getDeclaredField("components");
             f.setAccessible(true);

@@ -8,10 +8,9 @@ import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.std.wiring.Constant;
 import com.cburch.logisim.verilog.comp.auxiliary.LogicalMemory;
 import com.cburch.logisim.verilog.comp.auxiliary.ModulePort;
-import com.cburch.logisim.verilog.comp.auxiliary.netconn.BitRef;
-import com.cburch.logisim.verilog.comp.auxiliary.netconn.Const0;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleImpl;
+import com.cburch.logisim.verilog.file.ui.NameConflictUI;
 import com.cburch.logisim.verilog.layout.MemoryIndex;
 import com.cburch.logisim.verilog.layout.ModuleNetIndex;
 
@@ -24,15 +23,67 @@ import static com.cburch.logisim.verilog.file.importer.VerilogJsonImporter.GRID;
 import static com.cburch.logisim.verilog.std.AbstractComponentAdapter.setParsedByName;
 
 public class ImporterUtils {
+    // ===== 1) API limpia: lógica de creación/reemplazo sin UI directa =====
     static Circuit ensureCircuit(Project proj, String name) {
         LogisimFile file = proj.getLogisimFile();
+
+        // ¿ya existe?
+        Circuit existing = findCircuit(file, name);
+        if (existing == null) {
+            Circuit c = new Circuit(name);
+            proj.doAction(LogisimFileActions.addCircuit(c));
+            return c;
+        }
+
+        // Delegar decisión a la capa UI
+        NameConflictUI.NameConflictResult res = NameConflictUI.askUser(proj, name);
+        switch (res.choice()) {
+            case REPLACE -> {
+                proj.doAction(LogisimFileActions.removeCircuit(existing));
+                Circuit c = new Circuit(name);
+                proj.doAction(LogisimFileActions.addCircuit(c));
+                System.out.println("[Importer] Circuito '" + name + "' fue reemplazado.");
+                return c;
+            }
+            case CREATE_NEW -> {
+                String newName = makeUniqueName(file, res.suggestedName() != null ? res.suggestedName() : (name + "_new"));
+                Circuit c = new Circuit(newName);
+                proj.doAction(LogisimFileActions.addCircuit(c));
+                System.out.println("[Importer] Circuito duplicado -> creado como '" + newName + "'.");
+                return c;
+            }
+            case CANCEL -> {
+                System.out.println("[Importer] Usuario canceló la creación del circuito '" + name + "'.");
+                // Devolvemos el existente para no romper flujos
+                return existing;
+            }
+            default -> {
+                // Fallback defensivo
+                return existing;
+            }
+        }
+    }
+
+    // ===== 2) Helpers sin UI =====
+    private static Circuit findCircuit(LogisimFile file, String name) {
         for (Circuit c : file.getCircuits()) {
             if (c.getName().equals(name)) return c;
         }
+        return null;
+    }
 
-        Circuit c = new Circuit(name);
-        proj.doAction(LogisimFileActions.addCircuit(c));
-        return c;
+    private static boolean circuitExists(LogisimFile file, String name) {
+        return findCircuit(file, name) != null;
+    }
+
+    private static String makeUniqueName(LogisimFile file, String base) {
+        String candidate = base;
+        int i = 1;
+        while (circuitExists(file, candidate)) {
+            candidate = base + i;
+            i++;
+        }
+        return candidate;
     }
 
     static int snap(int v) { return (v/GRID)*GRID; }
@@ -108,20 +159,7 @@ public class ImporterUtils {
         }
     }
 
-    /* ===== utilidades para Constant (copias seguras de tus helpers) ===== */
-
-    /** Devuelve "0"/"1" si el BitRef es Const0/Const1; "x"/"z" si lo son; null si no es constante. */
-    static String constKind(BitRef br) {
-        if (br == null) return null;
-        if (br instanceof Const0) return "0";
-        String n = br.getClass().getSimpleName();
-        return switch (n) {
-            case "Const1" -> "1";
-            case "ConstX" -> "x";
-            case "ConstZ" -> "z";
-            default -> null;
-        };
-    }
+    /* ===== utilidades para Constant ===== */
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     static void setConstantValueFlexible(AttributeSet a, int width, int value) {

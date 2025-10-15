@@ -5,13 +5,7 @@ package com.cburch.logisim.circuit;
 
 import java.awt.Color;
 import java.awt.Graphics;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import com.cburch.logisim.comp.Component;
 import com.cburch.logisim.comp.ComponentDrawContext;
@@ -68,17 +62,26 @@ class CircuitWires {
 			if (attr == StdAttr.LABEL || attr == PullResistor.ATTR_PULL_TYPE) {
 				voidBundleMap();
 			}
-            // BitLabeledTunnel: si cambia label, width, bitSpecs o modo output → recomputar
-            if (attr == StdAttr.WIDTH
-                    || attr == BitLabeledTunnel.BIT_SPECS
-                    || attr == BitLabeledTunnel.ATTR_OUTPUT
-                    || attr == StdAttr.FACING) {
-                voidBundleMap();
-            }
 		}
 	}
 
-	static class BundleMap {
+    private class BitTunnelListener implements AttributeListener {
+        @Override public void attributeListChanged(AttributeEvent e) { }
+
+        @Override public void attributeValueChanged(AttributeEvent e) {
+            Attribute<?> a = e.getAttribute();
+            // Cambios que afectan al cableado / modo y deben recomputar bundles
+            if (a == StdAttr.LABEL
+                    || a == com.cburch.logisim.std.wiring.BitLabeledTunnel.BIT_SPECS
+                    || a == com.cburch.logisim.std.wiring.BitLabeledTunnel.ATTR_OUTPUT
+                    || a == StdAttr.FACING
+                    || a == StdAttr.WIDTH) {
+                voidBundleMap();
+            }
+        }
+    }
+
+    static class BundleMap {
 		boolean computed = false;
 		HashMap<Location,WireBundle> pointBundles = new HashMap<Location,WireBundle>();
 		HashSet<WireBundle> bundles = new HashSet<WireBundle>();
@@ -149,6 +152,7 @@ class CircuitWires {
 	private HashSet<Wire> wires = new HashSet<Wire>();
 	private HashSet<Splitter> splitters = new HashSet<Splitter>();
     private final HashSet<Component> bitTunnels = new HashSet<>(); // componentes con BitLabeledTunnel factory
+    private final BitTunnelListener bitTunnelListener = new BitTunnelListener();
     private HashSet<Component> tunnels = new HashSet<Component>(); // of Components with Tunnel factory
 	private TunnelListener tunnelListener = new TunnelListener();
 	private HashSet<Component> pulls = new HashSet<Component>(); // of Components with PullResistor factory
@@ -250,7 +254,7 @@ class CircuitWires {
 				comp.getAttributeSet().addAttributeListener(tunnelListener);
 			} else if (factory instanceof BitLabeledTunnel) {
                 bitTunnels.add(comp);
-                comp.getAttributeSet().addAttributeListener(tunnelListener);
+                comp.getAttributeSet().addAttributeListener(bitTunnelListener);
             }
 		}
 		if (added) {
@@ -275,7 +279,7 @@ class CircuitWires {
 				comp.getAttributeSet().removeAttributeListener(tunnelListener);
 			} else if (factory instanceof BitLabeledTunnel) {
                 bitTunnels.add(comp);
-                comp.getAttributeSet().addAttributeListener(tunnelListener);
+                comp.getAttributeSet().addAttributeListener(bitTunnelListener);
             }
 		}
 		points.remove(comp);
@@ -829,74 +833,107 @@ class CircuitWires {
     private void connectBitLabeledTunnels(BundleMap ret) {
         if (bitTunnels.isEmpty()) return;
 
-        HashMap<String, WireBundle> labelBundles = new HashMap<>();
+        // Repositorios compartidos
+        final Map<String, WireBundle> labelBundles = new HashMap<>();
+        final Map<String, WireBundle> constBundles = new HashMap<>(); // "C0","C1","CX"
 
         for (Component comp : bitTunnels) {
             EndData end = comp.getEnd(0);
             if (end == null) continue;
+
             Location loc = end.getLocation();
-            WireBundle bltBundle = ret.getBundleAt(loc);
-            if (bltBundle == null) bltBundle = ret.createBundleAt(loc);
+            WireBundle bltB = ret.getBundleAt(loc);
+            if (bltB == null) bltB = ret.createBundleAt(loc);
 
-            BitWidth w = end.getWidth();
-            if (w == null || w == BitWidth.UNKNOWN) continue;
-            int width = Math.max(1, w.getWidth());
-            bltBundle.setWidth(w, loc);
+            BitWidth bw = end.getWidth();
+            if (bw == null || bw == BitWidth.UNKNOWN) continue;
+            final int width = Math.max(1, bw.getWidth());
+            bltB.setWidth(bw, loc); // asegura threads del BLT
 
+            // Lee/normaliza CSV → specs[i]
             AttributeSet a = comp.getAttributeSet();
             String csv = "";
             try {
-                String s = a.getValue(BitLabeledTunnel.BIT_SPECS);
+                String s = a.getValue(com.cburch.logisim.std.wiring.BitLabeledTunnel.BIT_SPECS);
                 if (s != null) csv = s;
             } catch (Throwable ignore) { }
 
-            String[] toks = csv.split(",");
-            String[] specs = new String[width];
+            final String[] toks = csv.split(",");
+            final int usable = Math.min(width, toks.length);
+            final String[] specs = new String[width];
             for (int i = 0; i < width; i++) {
-                if (i < toks.length) specs[i] = toks[i].trim();
-                else specs[i] = "x";
+                specs[i] = (i < usable ? toks[i].trim() : "x");
             }
 
-            WireThread[] bt = bltBundle.threads;
-            if (!bltBundle.isValid() || bt == null || bt.length < width) continue;
+            WireThread[] bltTh = bltB.threads;
+            if (!bltB.isValid() || bltTh == null || bltTh.length < width) continue;
 
             for (int i = 0; i < width; i++) {
-                String lab = specs[i];
-                if (lab == null || lab.isBlank()) continue;
+                String t = specs[i];
+                if (t == null || t.isBlank()) continue;
 
-                // --- 1️⃣ Si es constante, fija el hilo directamente ---
-                switch (lab) {
-                    case "0":
-                        bltBundle.addPullValue(Value.FALSE);
-                        continue;
-                    case "1":
-                        bltBundle.addPullValue(Value.TRUE);
-                        continue;
-                    case "x":
-                    case "X":
-                        bltBundle.addPullValue(Value.UNKNOWN);
-                        continue;
-                }
+                // Normaliza token
+                String token = normalizeToken(t);
 
-                // --- 2️⃣ Si es etiqueta normal, une con bundle compartido ---
-                WireBundle lb = labelBundles.get(lab);
-                if (lb == null) {
-                    Location pseudo = pseudoLocForLabel(lab);
-                    lb = ret.getBundleAt(pseudo);
-                    if (lb == null) {
-                        lb = ret.createBundleAt(pseudo);
-                        lb.setWidth(BitWidth.ONE, pseudo);
+                // === Constantes per-bit: une con bundle 1-bit de pull ===
+                if ("0".equals(token) || "1".equals(token) || "x".equals(token)) {
+                    // Reutiliza por tipo: C0, C1, CX
+                    String key = "C" + token.toUpperCase(); // C0/C1/CX
+                    WireBundle cb = constBundles.get(key);
+                    if (cb == null) {
+                        // Usa pseudo-loc único por clave
+                        Location pseudo = pseudoLocForLabel(key);
+                        cb = ret.getBundleAt(pseudo);
+                        if (cb == null) cb = ret.createBundleAt(pseudo);
+                        cb.setWidth(BitWidth.ONE, pseudo);
+                        // pull del bundle 1-bit
+                        Value pv = "0".equals(token) ? Value.FALSE : "1".equals(token) ? Value.TRUE : Value.UNKNOWN;
+                        cb.addPullValue(pv);
+                        constBundles.put(key, cb);
                     }
-                    labelBundles.put(lab, lb);
+                    WireThread[] ct = cb.threads;
+                    if (cb.isValid() && ct != null && ct.length >= 1) {
+                        try { bltTh[i].unite(ct[0]); } catch (Throwable ignore) {}
+                    }
+                    continue;
                 }
 
+                // === Labels/nets per-bit: une por token exacto (p.ej. N123) ===
+                WireBundle lb = labelBundles.get(token);
+                if (lb == null) {
+                    Location pseudo = pseudoLocForLabel(token);
+                    lb = ret.getBundleAt(pseudo);
+                    if (lb == null) lb = ret.createBundleAt(pseudo);
+                    // 1 bit por hilo “lógico” de etiqueta
+                    lb.setWidth(BitWidth.ONE, pseudo);
+                    labelBundles.put(token, lb);
+                }
                 WireThread[] lbt = lb.threads;
-                if (!lb.isValid() || lbt == null || lbt.length < 1) continue;
-
-                try {
-                    bt[i].unite(lbt[0]);
-                } catch (Throwable ignore) {}
+                if (lb.isValid() && lbt != null && lbt.length >= 1) {
+                    try { bltTh[i].unite(lbt[0]); } catch (Throwable ignore) {}
+                }
             }
         }
+    }
+
+    /** Normaliza el token del CSV:
+     *  - "0","1","x"/"X" → tal cual en minúscula
+     *  - "N123" → "N123" (en mayúscula la 'N')
+     *  - cualquier otra cosa → trim, tal cual (puedes endurecer aquí si quieres)
+     */
+    private static String normalizeToken(String raw) {
+        String s = raw.trim();
+        if (s.equals("0") || s.equals("1")) return s;
+        if (s.equalsIgnoreCase("x")) return "x";
+        if (s.length() > 1 && (s.charAt(0) == 'n' || s.charAt(0) == 'N')) {
+            // N<num>
+            try {
+                int id = Integer.parseInt(s.substring(1).trim());
+                return "N" + id;
+            } catch (Exception ignore) {
+                // cae a genérico
+            }
+        }
+        return s;
     }
 }

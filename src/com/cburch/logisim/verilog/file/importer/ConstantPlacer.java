@@ -2,6 +2,7 @@ package com.cburch.logisim.verilog.file.importer;
 
 import com.cburch.logisim.circuit.Wire;
 import com.cburch.logisim.comp.Component;
+import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.comp.EndData;
 import com.cburch.logisim.data.*;
 import com.cburch.logisim.instance.StdAttr;
@@ -110,7 +111,8 @@ final class ConstantPlacer {
                                     Direction facing) {
         Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, -grid);
 
-        AttributeSet a = Constant.FACTORY.createAttributeSet();
+        ComponentFactory constF = Constant.FACTORY;
+        AttributeSet a = constF.createAttributeSet();
         try { a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width))); } catch (Exception ignore) {}
         try { a.setValue(StdAttr.FACING, facing); } catch (Exception ignore) {}
 
@@ -119,13 +121,13 @@ final class ConstantPlacer {
         try { ImporterUtils.Attrs.setConstantValueFlexible(a, width, value); ok = true; } catch (Throwable ignore) {}
         if (!ok) setParsedByName(a, "value", "0x" + Integer.toHexString(value));
 
-        Component probe = Constant.FACTORY.createComponent(Location.create(0, 0), a);
+        Component probe = constF.createComponent(Location.create(0, 0), a);
         EndData end0 = probe.getEnd(0);
         int offX = end0.getLocation().getX() - probe.getLocation().getX();
         int offY = end0.getLocation().getY() - probe.getLocation().getY();
         Location constLoc = Location.create(kLoc.getX() - offX, kLoc.getY() - offY);
 
         batch.add(Wire.create(kLoc, mouth));
-        batch.add(Constant.FACTORY.createComponent(constLoc, a));
+        batch.add(constF.createComponent(constLoc, a));
     }
 }

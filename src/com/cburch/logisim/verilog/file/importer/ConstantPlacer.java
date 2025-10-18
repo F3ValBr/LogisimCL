@@ -109,25 +109,27 @@ final class ConstantPlacer {
                                     int width,
                                     int value,
                                     Direction facing) {
-        Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, -grid);
+        try {
+            Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, -grid);
 
-        ComponentFactory constF = Constant.FACTORY;
-        AttributeSet a = constF.createAttributeSet();
-        try { a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width))); } catch (Exception ignore) {}
-        try { a.setValue(StdAttr.FACING, facing); } catch (Exception ignore) {}
+            ComponentFactory constF = Constant.FACTORY;
+            AttributeSet a = constF.createAttributeSet();
+            try { a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width))); } catch (Exception ignore) {}
+            try { a.setValue(StdAttr.FACING, facing); } catch (Exception ignore) {}
 
-        // valor
-        boolean ok = false;
-        try { ImporterUtils.Attrs.setConstantValueFlexible(a, width, value); ok = true; } catch (Throwable ignore) {}
-        if (!ok) setParsedByName(a, "value", "0x" + Integer.toHexString(value));
+            // valor
+            boolean ok = false;
+            try { ImporterUtils.Attrs.setConstantValueFlexible(a, width, value); ok = true; } catch (Throwable ignore) {}
+            if (!ok) setParsedByName(a, "value", "0x" + Integer.toHexString(value));
 
-        Component probe = constF.createComponent(Location.create(0, 0), a);
-        EndData end0 = probe.getEnd(0);
-        int offX = end0.getLocation().getX() - probe.getLocation().getX();
-        int offY = end0.getLocation().getY() - probe.getLocation().getY();
-        Location constLoc = Location.create(kLoc.getX() - offX, kLoc.getY() - offY);
+            Component probe = constF.createComponent(Location.create(0, 0), a);
+            EndData end0 = probe.getEnd(0);
+            int offX = end0.getLocation().getX() - probe.getLocation().getX();
+            int offY = end0.getLocation().getY() - probe.getLocation().getY();
+            Location constLoc = Location.create(kLoc.getX() - offX, kLoc.getY() - offY);
 
-        batch.add(Wire.create(kLoc, mouth));
-        batch.add(constF.createComponent(constLoc, a));
+            batch.add(Wire.create(kLoc, mouth));
+            batch.add(constF.createComponent(constLoc, a));
+        } catch (Throwable ignore) { }
     }
 }

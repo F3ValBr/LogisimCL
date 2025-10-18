@@ -116,25 +116,27 @@ final class TunnelPlacer {
                                         String label,
                                         Direction facing,
                                         boolean attrOutput) {
-        Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, -grid);
+        try {
+            Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, -grid);
 
-        batch.add(Wire.create(kLoc, mouth));
+            batch.add(Wire.create(kLoc, mouth));
 
-        BitLabeledTunnel bltFactory = BitLabeledTunnel.FACTORY;
+            BitLabeledTunnel bltFactory = BitLabeledTunnel.FACTORY;
 
-        AttributeSet a = bltFactory.createAttributeSet();
-        a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width)));
-        a.setValue(BitLabeledTunnel.BIT_SPECS, String.join(",", bitSpecs));
-        a.setValue(BitLabeledTunnel.ATTR_OUTPUT, attrOutput && (facing != Direction.WEST));
-        a.setValue(StdAttr.FACING, facing);
-        if (label != null && !label.isBlank()) a.setValue(StdAttr.LABEL, label);
+            AttributeSet a = bltFactory.createAttributeSet();
+            a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width)));
+            a.setValue(BitLabeledTunnel.BIT_SPECS, String.join(",", bitSpecs));
+            a.setValue(BitLabeledTunnel.ATTR_OUTPUT, attrOutput && (facing != Direction.WEST));
+            a.setValue(StdAttr.FACING, facing);
+            if (label != null && !label.isBlank()) a.setValue(StdAttr.LABEL, label);
 
-        Component probe = bltFactory.createComponent(Location.create(0, 0), a);
-        EndData end0 = probe.getEnd(0);
-        int offX = end0.getLocation().getX() - probe.getLocation().getX();
-        int offY = end0.getLocation().getY() - probe.getLocation().getY();
-        Location tunLoc = Location.create(kLoc.getX() - offX, kLoc.getY() - offY);
+            Component probe = bltFactory.createComponent(Location.create(0, 0), a);
+            EndData end0 = probe.getEnd(0);
+            int offX = end0.getLocation().getX() - probe.getLocation().getX();
+            int offY = end0.getLocation().getY() - probe.getLocation().getY();
+            Location tunLoc = Location.create(kLoc.getX() - offX, kLoc.getY() - offY);
 
-        batch.add(bltFactory.createComponent(tunLoc, a));
+            batch.add(bltFactory.createComponent(tunLoc, a));
+        } catch (Exception ignored) { }
     }
 }

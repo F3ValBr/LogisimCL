@@ -148,7 +148,6 @@ final class ImportPipeline {
                     t.printStackTrace(); // para no abortar el import si algo sale mal
                 }
 
-
                 alias.clear();
                 cellHandles.clear();
                 topAnchors.clear();

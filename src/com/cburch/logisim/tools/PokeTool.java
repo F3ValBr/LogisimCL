@@ -72,6 +72,10 @@ public class PokeTool extends Tool {
         private final Component comp;
         private final int anchorX, anchorY;
 
+        // --- selección actual dentro del tooltip ---
+        private int selectedBit = -1;
+        private String selectedToken = "";
+
         // --- highlight de coincidencias ---
         private static final class LineHit {
             Rectangle r;
@@ -142,9 +146,7 @@ public class PokeTool extends Tool {
             g2.setComposite(oldComp);
 
             // ---------- 3) Construcción de filas con metadatos ----------
-
             java.util.List<Row> rows = new java.util.ArrayList<>();
-
             rows.add(new Row(Strings.get("BLTname") + " " + (!label.isBlank() ? label : "not labeled"),
                     false, "", -1));
             rows.add(new Row(Strings.get("BLTmode") + " " + (outMode ? "[OUTPUT]" : "[INPUT]") + ", "
@@ -153,28 +155,28 @@ public class PokeTool extends Tool {
             rows.add(new Row(Strings.get("BLTvalue") + " " + toBinStringMSBFirst(bus),
                     false, "", -1));
 
-            // Warning opcional (NO clickeable)
             int csvCount = (csv == null || csv.isBlank()) ? 0 : csv.split(",").length;
             if (csvCount > 0 && csvCount != w) {
                 rows.add(new Row("WARN: specs vs width: " + csvCount + " != " + w, false, "", -1));
             }
 
-            // Título de sección
             rows.add(new Row(Strings.get("BLTbitdefs"), false, "", -1));
 
-            // Filas por bit (SÍ clickeables)
+            // Filas por bit (clickeables)
             for (int i = 0; i < w; i++) {
                 String spec  = specs.get(i);             // crudo (0/1/x/N…)
                 String pSpec = prettySpec(spec);         // legible
                 String bitv  = bitChar(bus.get(i));
-                String tok   = normalizeToken(spec);               // normalizado para matching
+                String tok   = normalizeToken(spec);     // normalizado para matching
                 String line  = "  b" + i + ": " + pSpec + " -> " + bitv;
                 rows.add(new Row(line, true, tok, i));
             }
 
             // ---------- 4) Medidas del cuadro ----------
             Font oldF = g.getFont();
-            g.setFont(new Font("monospaced", Font.PLAIN, 12));
+            Font mono = new Font("monospaced", Font.PLAIN, 12);
+            Font monoBold = mono.deriveFont(Font.BOLD);
+            g.setFont(mono);
             FontMetrics fm = g.getFontMetrics();
             int textW = 0;
             for (Row r : rows) textW = Math.max(textW, fm.stringWidth(r.text));
@@ -184,8 +186,8 @@ public class PokeTool extends Tool {
             int boxW = textW + PAD * 2;
             int boxH = (textH * rows.size()) + PAD * 2;
 
-            // ---------- 5) Posicionamiento dentro del viewport ----------
-            final int GAP = 12;  // separación del componente
+            // ---------- 5) Posicionamiento ----------
+            final int GAP = 12;
             int bx, by;
 
             if (anchorX != Integer.MIN_VALUE && anchorY != Integer.MIN_VALUE) {
@@ -207,7 +209,6 @@ public class PokeTool extends Tool {
                 }
             }
 
-            // Rectángulo visible de ESTA pasada de pintura
             java.awt.Rectangle clip = g.getClipBounds();
             if (clip == null || clip.width <= 0 || clip.height <= 0) {
                 clip = canvas.getVisibleRect();
@@ -216,14 +217,12 @@ public class PokeTool extends Tool {
                 }
             }
 
-            // Intento de “flip” si no cabe, luego clamp
             final int MARGIN = 4;
             int clipMinX = clip.x + MARGIN;
             int clipMinY = clip.y + MARGIN;
             int clipMaxX = clip.x + clip.width  - MARGIN;
             int clipMaxY = clip.y + clip.height - MARGIN;
 
-            // Flip horizontal si choca por la derecha o se sale por la izquierda
             if (bx + boxW > clipMaxX) {
                 int alt = b.getX() - (boxW + GAP);
                 if (alt >= clipMinX) bx = alt;
@@ -232,7 +231,6 @@ public class PokeTool extends Tool {
                 if (alt + boxW <= clipMaxX) bx = alt;
             }
 
-            // Flip vertical si choca por abajo o se sale por arriba
             if (by + boxH > clipMaxY) {
                 int alt = b.getY() - (boxH + GAP);
                 if (alt >= clipMinY) by = alt;
@@ -241,13 +239,12 @@ public class PokeTool extends Tool {
                 if (alt + boxH <= clipMaxY) by = alt;
             }
 
-            // Clamp final
             if (bx + boxW > clipMaxX) bx = clipMaxX - boxW;
             if (by + boxH > clipMaxY) by = clipMaxY - boxH;
             if (bx < clipMinX) bx = clipMinX;
             if (by < clipMinY) by = clipMinY;
 
-            // ---------- 6) Pintado del tooltip + generación de hit-boxes ----------
+            // ---------- 6) Pintado del tooltip + hit-boxes ----------
             hits.clear();
 
             g.setColor(caretColor);
@@ -256,15 +253,30 @@ public class PokeTool extends Tool {
             g.drawRoundRect(bx, by, boxW, boxH, 8, 8);
 
             int ty = by + PAD + fm.getAscent();
-            g.setColor(Color.BLACK);
             for (Row r : rows) {
+                boolean isSelectedRow = (r.clickable && r.bitIndex == selectedBit && r.token != null && r.token.equals(selectedToken));
+
+                // Fondo de fila seleccionada
+                if (isSelectedRow) {
+                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
+                    g2.setColor(new Color(255, 235, 150)); // amarillo suave
+                    g2.fillRoundRect(bx + 2, ty - fm.getAscent(), boxW - 4, textH, 6, 6);
+                    g2.setComposite(AlphaComposite.SrcOver);
+                }
+
+                // Texto (negrita si seleccionado)
+                if (isSelectedRow) g.setFont(monoBold);
+                else g.setFont(mono);
+
+                g.setColor(Color.BLACK);
                 g.drawString(r.text, bx + PAD, ty);
 
+                // hit-box de la fila (ya clamped/posicionada)
                 if (r.clickable && r.token != null && !r.token.isBlank()) {
-                    // rectángulo de click para toda la fila (con coords ya flipp/clampeadas)
                     Rectangle rr = new Rectangle(bx + 2, ty - fm.getAscent(), boxW - 4, textH);
                     hits.add(new LineHit(rr, r.bitIndex, r.token));
                 }
+
                 ty += textH;
             }
 
@@ -315,18 +327,32 @@ public class PokeTool extends Tool {
             Point p = e.getPoint();
             for (LineHit h : hits) {
                 if (h.r.contains(p)) {
-                    if (!h.token.isBlank()) highlightMatches(h.token);
+                    // guardar selección local
+                    selectedBit = h.bitIndex;
+                    selectedToken = (h.token == null) ? "" : h.token;
+
+                    if (!selectedToken.isBlank()) highlightMatches(selectedToken);
                     else clearHighlights();
                     return;
                 }
             }
+            // clic fuera de filas → limpiar selección y highlights
+            clearSelection();
             clearHighlights();
         }
 
-        @Override public void cancelEditing() { clearHighlights(); super.cancelEditing(); }
-        @Override public void stopEditing()   { clearHighlights(); super.stopEditing(); }
+        @Override public void cancelEditing() { clearSelection(); clearHighlights(); super.cancelEditing(); }
+        @Override public void stopEditing()   { clearSelection(); clearHighlights(); super.stopEditing(); }
 
-        // ---- Helpers ----
+        // ---- Helpers de UI/selección ----
+        private void clearSelection() {
+            if (selectedBit != -1 || (selectedToken != null && !selectedToken.isBlank())) {
+                selectedBit = -1;
+                selectedToken = "";
+                canvas.getProject().repaintCanvas();
+            }
+        }
+
         private static String bitChar(Value v) {
             if (v == null) return "X";
             if (v == Value.ERROR) return "E";
@@ -375,7 +401,7 @@ public class PokeTool extends Tool {
             Circuit circ = canvas.getCircuit();
             if (circ == null) return;
 
-            for (Component c : circ.getNonWires()) { // 👈 reemplazo de circ.getComponents()
+            for (Component c : circ.getNonWires()) {
                 if (!(c.getFactory() instanceof BitLabeledTunnel)) continue;
                 AttributeSet as = c.getAttributeSet();
                 String csv = null;

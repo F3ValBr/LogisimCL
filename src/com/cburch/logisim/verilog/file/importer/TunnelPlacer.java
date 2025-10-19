@@ -43,14 +43,14 @@ final class TunnelPlacer {
         record K(int x, int y, String lbl, boolean out) {}
         Set<K> placed = new HashSet<>();
 
-        // TOP ports
+        // ===== TOP ports =====
         for (ModulePort p : mod.ports()) {
             var anc = topAnchors.get(p);
             if (anc == null) continue;
 
             List<String> bitSpecs = specs.buildBitSpecsForTopPort(mod.name(), p);
             boolean all01 = bitSpecs.stream().allMatch(s -> "0".equals(s) || "1".equals(s));
-            if (all01) continue; // No tunnel for all-constant, handled by ConstantPlacer
+            if (all01) continue; // constantes puras: las maneja ConstantPlacer
 
             boolean attrOutput = (p.direction() == PortDirection.OUTPUT);
             Direction facing = (anc.facing() == Direction.EAST) ? Direction.WEST : Direction.EAST;
@@ -58,12 +58,17 @@ final class TunnelPlacer {
 
             Location kLoc = ImporterUtils.Geom.stepFrom(anc.loc(), facing, -grid);
             K key = new K(kLoc.getX(), kLoc.getY(), pretty, attrOutput);
-            if (placed.add(key)) {
-                createBitLabeledTunnel(batch, anc.loc(), Math.max(1, p.width()), bitSpecs, pretty, facing, attrOutput);
+            if (!placed.add(key)) continue;
+
+            int w = Math.max(1, p.width());
+            if (w <= 32) {
+                createBitLabeledTunnel(batch, anc.loc(), w, bitSpecs, pretty, facing, attrOutput);
+            } else {
+                placeOverflowTunnels(batch, anc.loc(), w, bitSpecs, facing, attrOutput);
             }
         }
 
-        // Cells
+        // ===== Celdas =====
         for (var e : cellHandles.entrySet()) {
             VerilogCell cell = e.getKey();
             InstanceHandle ih = e.getValue();
@@ -72,7 +77,7 @@ final class TunnelPlacer {
             for (String port : cell.getPortNames()) {
                 int w = Math.max(1, cell.portWidth(port));
 
-                // Skip constant ports
+                // Saltar puertos constantes
                 PortEndpoint[] byIdx = new PortEndpoint[w];
                 for (PortEndpoint ep : cell.endpoints()) {
                     if (!port.equals(ep.getPortName())) continue;
@@ -93,8 +98,12 @@ final class TunnelPlacer {
 
                 Location kLoc = ImporterUtils.Geom.stepFrom(pin, facing, grid);
                 K key = new K(kLoc.getX(), kLoc.getY(), pretty, attrOutput);
-                if (placed.add(key)) {
+                if (!placed.add(key)) continue;
+
+                if (w <= 32) {
                     createBitLabeledTunnel(batch, pin, w, bitSpecs, pretty, facing, attrOutput);
+                } else {
+                    placeOverflowTunnels(batch, pin, w, bitSpecs, facing, attrOutput);
                 }
             }
         }
@@ -130,6 +139,7 @@ final class TunnelPlacer {
             a.setValue(StdAttr.FACING, facing);
             if (label != null && !label.isBlank()) a.setValue(StdAttr.LABEL, label);
 
+            // Alinear pin: igual que tu lógica original
             Component probe = bltFactory.createComponent(Location.create(0, 0), a);
             EndData end0 = probe.getEnd(0);
             int offX = end0.getLocation().getX() - probe.getLocation().getX();
@@ -138,5 +148,81 @@ final class TunnelPlacer {
 
             batch.add(bltFactory.createComponent(tunLoc, a));
         } catch (Exception ignored) { }
+    }
+
+    /* ===================== Overflow helpers ===================== */
+
+    /** Divide en BLT(32) conectado + BLT(resto) sin conectar (solo aviso). */
+    private void placeOverflowTunnels(ImportBatch batch,
+                                      Location mouth,
+                                      int width,
+                                      List<String> specs,
+                                      Direction facing,
+                                      boolean attrOutput) {
+        final int LOW = 32;
+        final int wEff = Math.max(1, width);
+        final int lowCount = Math.min(LOW, wEff);
+        final int rest = Math.max(0, wEff - lowCount);
+
+        // Normalizar lista de specs al menos a width elementos
+        List<String> safe = new ArrayList<>(wEff);
+        for (int i = 0; i < wEff; i++) {
+            safe.add(i < specs.size() ? nonNullTrim(specs.get(i)) : "x");
+        }
+
+        // 1) BLT(32) conectado
+        List<String> lowSpecs = safe.subList(0, lowCount);
+        String lblLow = SpecBuilder.makePrettyLabel(lowSpecs);
+        createBitLabeledTunnel(batch, mouth, lowCount, lowSpecs, lblLow, facing, attrOutput);
+
+        // 2) BLT(resto) sin conectar (solo recordatorio visual)
+        if (rest > 0) {
+            List<String> restSpecs = new ArrayList<>(rest);
+            for (int i = 0; i < rest; i++) restSpecs.add(safe.get(lowCount + i));
+            String lblRest = SpecBuilder.makePrettyLabel(restSpecs);
+            Location side = ImporterUtils.Geom.stepFrom(mouth, facing, -3 * grid);
+            createBltDecorated(batch, side, rest, restSpecs, lblRest, facing, attrOutput, ">32 bits");
+        }
+    }
+
+    /** Coloca un BLT sin cable (decorativo/aviso). */
+    private void createBltDecorated(ImportBatch batch,
+                                    Location where,
+                                    int width,
+                                    List<String> bitSpecs,
+                                    String label,
+                                    Direction facing,
+                                    boolean attrOutput,
+                                    String suffixNote) {
+        try {
+            BitLabeledTunnel bltFactory = BitLabeledTunnel.FACTORY;
+
+            AttributeSet a = bltFactory.createAttributeSet();
+            a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width)));
+            a.setValue(BitLabeledTunnel.BIT_SPECS, String.join(",", bitSpecs));
+            a.setValue(BitLabeledTunnel.ATTR_OUTPUT, attrOutput && (facing != Direction.WEST));
+            a.setValue(StdAttr.FACING, facing);
+            String lbl = (label == null ? "" : label.trim());
+            if (!lbl.isEmpty() && suffixNote != null && !suffixNote.isBlank()) {
+                lbl = lbl + " " + suffixNote;
+            } else if (lbl.isEmpty() && suffixNote != null && !suffixNote.isBlank()) {
+                lbl = suffixNote;
+            }
+            if (!lbl.isBlank()) a.setValue(StdAttr.LABEL, lbl);
+
+            // Colocar el componente de forma alineada en 'where' (como si fuera la boca),
+            // para que quede bien posicionado visualmente aunque no tenga cable.
+            Component probe = bltFactory.createComponent(Location.create(0, 0), a);
+            EndData end0 = probe.getEnd(0);
+            int offX = end0.getLocation().getX() - probe.getLocation().getX();
+            int offY = end0.getLocation().getY() - probe.getLocation().getY();
+            Location tunLoc = Location.create(where.getX() - offX, where.getY() - offY);
+
+            batch.add(bltFactory.createComponent(tunLoc, a));
+        } catch (Exception ignored) { }
+    }
+
+    private static String nonNullTrim(String s) {
+        return (s == null) ? "x" : s.trim();
     }
 }

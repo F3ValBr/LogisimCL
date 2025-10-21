@@ -21,6 +21,7 @@ import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.specs.CellParams;
 import com.cburch.logisim.verilog.comp.specs.GenericCellParams;
 import com.cburch.logisim.verilog.comp.specs.wordlvl.MuxOp;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.MuxOpParams;
 import com.cburch.logisim.verilog.std.*;
 import com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter;
 
@@ -33,11 +34,7 @@ public final class MuxOpAdapter extends AbstractComponentAdapter
     private final ModuleBlackBoxAdapter fallback = new ModuleBlackBoxAdapter();
 
     // Pareja (Library, ComponentFactory) para resolver port maps por librería
-    private static final class LibFactory {
-        final Library lib;
-        final ComponentFactory factory;
-        LibFactory(Library lib, ComponentFactory factory) { this.lib = lib; this.factory = factory; }
-    }
+    private record LibFactory(Library lib, ComponentFactory factory) { }
 
     @Override
     public boolean accepts(CellType t) {
@@ -159,6 +156,10 @@ public final class MuxOpAdapter extends AbstractComponentAdapter
     }
 
     private static int guessWidth(CellParams params) {
+        if (params instanceof MuxOpParams mp) {
+            int w = mp.width();
+            return Math.max(1, w);
+        }
         if (params instanceof GenericCellParams g) {
             Object w = g.asMap().get("WIDTH");
             int width = parseIntRelaxed(w, 1);

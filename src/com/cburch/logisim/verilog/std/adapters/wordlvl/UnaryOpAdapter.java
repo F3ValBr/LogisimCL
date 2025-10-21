@@ -40,7 +40,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
     private final MacroRegistry registry = MacroRegistry.bootUnaryDefaults();
 
     /** Pareja (Library, ComponentFactory) para poder resolver los mapas de puertos. */
-    private record LibAndFactory(Library lib, ComponentFactory factory) {}
+    private record LibFactory(Library lib, ComponentFactory factory) { }
 
     @Override
     public boolean accepts(CellType t) {
@@ -60,7 +60,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
             }
 
             // 2) Factory nativo (+ library) si hay
-            LibAndFactory lf = pickFactory(proj, op);
+            LibFactory lf = pickFactory(proj, op);
             if (lf == null || lf.factory() == null) {
                 return fallback.create(proj, circ, g, cell, where);
             }
@@ -88,12 +88,12 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
     @Override
     public ComponentFactory peekFactory(Project proj, VerilogCell cell) {
         UnaryOp op = UnaryOp.fromYosys(cell.type().typeId());
-        LibAndFactory lf = pickFactory(proj, op);
+        LibFactory lf = pickFactory(proj, op);
         return lf == null ? null : lf.factory();
     }
 
     /** Mapea BUF/NOT/LOGIC_NOT/NEG/POS a factories nativas y devuelve (lib,factory). */
-    private static LibAndFactory pickFactory(Project proj, UnaryOp op) {
+    private static LibFactory pickFactory(Project proj, UnaryOp op) {
         switch (op.category()) {
 
             case BITWISE -> {
@@ -107,7 +107,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
                 };
                 if (gateName == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(gates, gateName);
-                return (f == null) ? null : new LibAndFactory(gates, f);
+                return (f == null) ? null : new LibFactory(gates, f);
             }
 
             case LOGIC -> {
@@ -117,7 +117,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
                 String name = (op == UnaryOp.LOGIC_NOT) ? "Logical NOT Gate" : null;
                 if (name == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(yosysLib, name);
-                return (f == null) ? null : new LibAndFactory(yosysLib, f);
+                return (f == null) ? null : new LibFactory(yosysLib, f);
             }
 
             case ARITH -> {
@@ -126,13 +126,13 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
                         Library arith = proj.getLogisimFile().getLibrary("Arithmetic");
                         if (arith == null) return null;
                         ComponentFactory f = FactoryLookup.findFactory(arith, "Negator");
-                        return (f == null) ? null : new LibAndFactory(arith, f);
+                        return (f == null) ? null : new LibFactory(arith, f);
                     }
                     case POS -> {
                         Library gates = proj.getLogisimFile().getLibrary("Gates");
                         if (gates == null) return null;
                         ComponentFactory f = FactoryLookup.findFactory(gates, "Buffer");
-                        return (f == null) ? null : new LibAndFactory(gates, f);
+                        return (f == null) ? null : new LibFactory(gates, f);
                     }
                     default -> { return null; }
                 }

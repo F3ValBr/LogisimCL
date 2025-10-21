@@ -137,10 +137,12 @@ final class SpecBuilder {
     static String makePrettyLabel(List<String> specs) {
         boolean hasX = false;
         List<Integer> ordered = new ArrayList<>();
+        int bits = 0;
 
         if (specs != null) {
             for (String s : specs) {
                 if (s == null) continue;
+                bits++;
                 String t = s.trim();
                 if (t.equalsIgnoreCase("x") || t.equalsIgnoreCase("z")) {
                     hasX = true;       // cualquier X/Z fuerza etiqueta "x"
@@ -155,7 +157,7 @@ final class SpecBuilder {
             }
         }
 
-        if (hasX) return "X_UNDEF";          // mezcla con nets o solo X ⇒ "x"
+        if (hasX) return "X_UNDEF_" + bits;          // mezcla con nets o solo X ⇒ "x"
         if (ordered.isEmpty()) return ""; // solo constantes 0/1 (o vacío) ⇒ sin etiqueta
 
         List<int[]> ranges = contiguousRanges(ordered);

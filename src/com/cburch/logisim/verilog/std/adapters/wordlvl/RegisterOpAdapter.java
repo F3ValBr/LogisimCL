@@ -46,11 +46,7 @@ public final class RegisterOpAdapter extends AbstractComponentAdapter
     private final ModuleBlackBoxAdapter fallback = new ModuleBlackBoxAdapter();
 
     // Pareja (Library, ComponentFactory) para usar BuiltinPortMaps.forFactory(...)
-    private static final class LibFactory {
-        final Library lib;
-        final ComponentFactory factory;
-        LibFactory(Library lib, ComponentFactory factory) { this.lib = lib; this.factory = factory; }
-    }
+    private record LibFactory(Library lib, ComponentFactory factory) { }
 
     @Override
     public boolean accepts(CellType t) {

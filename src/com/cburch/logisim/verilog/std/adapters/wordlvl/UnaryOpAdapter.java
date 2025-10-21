@@ -17,6 +17,7 @@ import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.specs.CellParams;
 import com.cburch.logisim.verilog.comp.specs.GenericCellParams;
 import com.cburch.logisim.verilog.comp.specs.wordlvl.UnaryOp;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.UnaryOpParams;
 import com.cburch.logisim.verilog.std.*;
 import com.cburch.logisim.verilog.std.adapters.MacroRegistry;
 import com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter;
@@ -143,6 +144,12 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
 
     /** Heurística de ancho para unarias Yosys. */
     public static int guessUnaryWidth(CellParams params) {
+        if (params instanceof UnaryOpParams up) {
+            int aw = up.aWidth();
+            int yw = up.yWidth();
+            int w = Math.max(aw, yw);
+            return Math.max(1, w);
+        }
         if (params instanceof GenericCellParams g) {
             Object aw = g.asMap().get("A_WIDTH");
             Object yw = g.asMap().get("Y_WIDTH");

@@ -99,7 +99,7 @@ final class TunnelPlacer {
                 String label  = resolveNetname(mod, bitSpecs)
                         .orElse(pretty);
 
-                Direction facing = LayoutServices.facingByNearestBorder(ih.component.getBounds(g), pin);
+                Direction facing = LayoutServices.facingByNearestBorder(LayoutServices.figureBounds(ih.component, g), pin);
                 boolean attrOutput = (SpecBuilder.dirForPort(cell, port) == SpecBuilder.Dir.IN);
 
                 Location kLoc = ImporterUtils.Geom.stepFrom(pin, facing, grid);

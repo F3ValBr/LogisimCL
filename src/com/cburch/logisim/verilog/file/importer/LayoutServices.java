@@ -2,7 +2,9 @@ package com.cburch.logisim.verilog.file.importer;
 
 import com.cburch.logisim.circuit.Circuit;
 import com.cburch.logisim.comp.Component;
+import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.data.*;
+import com.cburch.logisim.instance.InstanceFactory;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.std.wiring.Pin;
@@ -102,5 +104,27 @@ final class LayoutServices {
         if (dyT < min) { min = dyT; facing = Direction.SOUTH; }
         if (dyB < min) { facing = Direction.NORTH; }
         return facing;
+    }
+
+    /** Bounds SOLO del cuerpo del componente (sin label). */
+    static Bounds figureBounds(Component c, Graphics g) {
+        try {
+            ComponentFactory f = c.getFactory();
+            if (f instanceof InstanceFactory) {
+                AttributeSet attrs = c.getAttributeSet();
+                Bounds off = f.getOffsetBounds(attrs);
+                if (off != null) {
+                    Location loc = c.getLocation();
+                    return Bounds.create(
+                            loc.getX() + off.getX(),
+                            loc.getY() + off.getY(),
+                            off.getWidth(),
+                            off.getHeight()
+                    );
+                }
+            }
+        } catch (Throwable ignore) { }
+        // Fallback: si no es InstanceFactory o falla, usa el bounds total.
+        return c.getBounds(g);
     }
 }

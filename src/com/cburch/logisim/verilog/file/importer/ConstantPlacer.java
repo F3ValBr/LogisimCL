@@ -87,7 +87,7 @@ final class ConstantPlacer {
                     bits.add(b);
                 }
 
-                Direction facing = LayoutServices.facingByNearestBorder(ih.component.getBounds(g), mouth);
+                Direction facing = LayoutServices.facingByNearestBorder(LayoutServices.figureBounds(ih.component, g), mouth);
                 placeConstantChunks(batch, proj, mouth, facing, bits);
             }
         }

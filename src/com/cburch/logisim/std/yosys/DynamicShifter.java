@@ -25,7 +25,7 @@ public class DynamicShifter extends InstanceFactory {
 
     // ---- Signo de entradas ----
     static final Attribute<Boolean> ATTR_A_SIGNED =
-            Attributes.forBoolean("aSigned", Strings.getter("shfterASigned"));
+            Attributes.forBoolean("aSigned", Strings.getter("shifterASigned"));
     static final Attribute<Boolean> ATTR_B_SIGNED =
             Attributes.forBoolean("bSigned", Strings.getter("shifterBSigned"));
 

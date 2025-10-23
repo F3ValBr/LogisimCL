@@ -17,6 +17,7 @@ public final class BuiltinPortMaps {
     }
 
     public enum ComparatorOut { EQ, LT, GT }
+    public enum DividerOut    { QUOT, REM }
 
     private static final Map<String, Map<String,Integer>> BY_NAME = new HashMap<>();
     private static final Map<String, PortIndexResolver>   RESOLVER_BY_NAME = new HashMap<>();
@@ -54,6 +55,7 @@ public final class BuiltinPortMaps {
         }
     }
 
+    // === Comparadores ===
     public static Map<String,Integer> forComparator(Library lib, ComponentFactory f, Component instanceOrNull,
                                                     ComparatorOut out) {
         Map<String,Integer> base = forFactory(lib, f, instanceOrNull);
@@ -70,6 +72,23 @@ public final class BuiltinPortMaps {
             default -> yIdx = m.getOrDefault("EQ", 3);
         }
         m.put("Y", yIdx); // alias lógico para cablear “Y” del JSON al pin correcto
+        return m;
+    }
+
+    // === Divisores y módulos ===
+    public static Map<String,Integer> forDivider(Library lib, ComponentFactory f, Component instanceOrNull,
+                                                 DividerOut out) {
+        Map<String,Integer> base = forFactory(lib, f, instanceOrNull);
+        // Fallback estándar: A=0, B=1, QUOT=2, REM=4
+        LinkedHashMap<String,Integer> m = new LinkedHashMap<>(base.isEmpty()
+                ? Map.of("A", 0, "B", 1, "QUOT", 2, "REM", 4)
+                : base);
+
+        int yIdx = (out == DividerOut.REM)
+                ? m.getOrDefault("REM", 4)
+                : m.getOrDefault("QUOT", 2);
+
+        m.put("Y", yIdx); // alias lógico para el puerto “Y” del JSON
         return m;
     }
 

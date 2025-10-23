@@ -20,7 +20,7 @@ public final class ArithmeticPortMapRegister implements PortMapRegister {
         BuiltinPortMaps.registerByName(arithLib.getName(), "Multiplier",
                 Map.of("A", 0, "B", 1, "Y", 2, "CIN", 3, "COUT", 4));
         BuiltinPortMaps.registerByName(arithLib.getName(), "Divider",
-                Map.of("A", 0, "B", 1, "Y", 2, "REM", 3));
+                Map.of("A", 0, "B", 1, "Y", 2, "REM", 4));
         BuiltinPortMaps.registerByName(arithLib.getName(), "Comparator",
                 Map.of("A", 0, "B", 1, "GT", 2, "EQ", 3, "LT", 4));
         BuiltinPortMaps.registerByName(arithLib.getName(), "Negator",

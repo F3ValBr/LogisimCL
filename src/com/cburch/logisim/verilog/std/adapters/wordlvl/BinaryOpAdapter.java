@@ -89,6 +89,12 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
             // Signo (si el componente tiene el atributo correspondiente)
             applySignedModeIfAvailable(attrs, op, aSigned, bSigned);
 
+            // Si es división/mod, configurar modo trunc|floor del Divider
+            if (op.category() == BinaryOp.Category.ARITH &&
+                    (op == BinaryOp.DIV || op == BinaryOp.MOD || op == BinaryOp.DIVFLOOR || op == BinaryOp.MODFLOOR)) {
+                configureDividerAttributes(attrs, op);
+            }
+
             if (op.category() == BinaryOp.Category.SHIFT) {
                 configureShifterAttributes(attrs, op, cell);
             }
@@ -107,6 +113,15 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                         default -> BuiltinPortMaps.ComparatorOut.EQ;
                     };
                     yield BuiltinPortMaps.forComparator(lf.lib, lf.factory, comp, outSel);
+                }
+                case ARITH -> {
+                    if (op == BinaryOp.DIV || op == BinaryOp.DIVFLOOR) {
+                        yield BuiltinPortMaps.forDivider(lf.lib, lf.factory, comp, BuiltinPortMaps.DividerOut.QUOT);
+                    } else if (op == BinaryOp.MOD || op == BinaryOp.MODFLOOR) {
+                        yield BuiltinPortMaps.forDivider(lf.lib, lf.factory, comp, BuiltinPortMaps.DividerOut.REM);
+                    } else {
+                        yield BuiltinPortMaps.forFactory(lf.lib, lf.factory, comp);
+                    }
                 }
                 default -> BuiltinPortMaps.forFactory(lf.lib, lf.factory, comp);
             };
@@ -302,5 +317,12 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
             default        -> "lr";
         };
         setOptionByName(attrs, "shift", shiftId);
+    }
+
+    /** Configura el modo del Divider (trunc|floor) según el op. */
+    private void configureDividerAttributes(AttributeSet attrs, BinaryOp op) {
+        // DIV/MOD => trunc ; DIVFLOOR/MODFLOOR => floor
+        final String mode = (op == BinaryOp.DIVFLOOR || op == BinaryOp.MODFLOOR) ? "floor" : "trunc";
+        setOptionByName(attrs, "divMode", mode);
     }
 }

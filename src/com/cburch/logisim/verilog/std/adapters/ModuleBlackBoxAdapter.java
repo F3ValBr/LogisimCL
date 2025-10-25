@@ -14,6 +14,8 @@ import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.std.wiring.Pin;
 import com.cburch.logisim.verilog.comp.auxiliary.CellType;
+import com.cburch.logisim.verilog.comp.auxiliary.PortEndpoint;
+import com.cburch.logisim.verilog.comp.auxiliary.netconn.PortDirection;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.file.materializer.ModuleMaterializer;
 import com.cburch.logisim.verilog.std.*;
@@ -70,7 +72,16 @@ public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
             // 3) Si el circuito está vacío, crear pines de fallback: mitad IN, mitad OUT por orden alfabético.
             List<String> orderForNameToIdx = null;
             if (!circuitHasAnyComponent(newCirc) && createdNow) {
-                orderForNameToIdx = populateFallbackPins(proj, newCirc, cell);
+                // Primero: intentar desde endpoints()
+                Map<String, PortDirection> dirs = directionsFromEndpoints(cell);
+
+                if (!dirs.isEmpty()) {
+                    orderForNameToIdx = populatePinsFromDirections(proj, newCirc, cell, dirs);
+                }
+                // Si no salió nada útil de endpoints (o devolvió null), caer al fallback 50/50.
+                if (orderForNameToIdx == null) {
+                    orderForNameToIdx = populateFallbackPins(proj, newCirc, cell);
+                }
             }
 
             // 4) Instanciar el subcircuito
@@ -104,6 +115,78 @@ public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
     }
 
     /* -------------------- Fallback: mitad IN / mitad OUT -------------------- */
+
+    private List<String> populatePinsFromDirections(Project proj, Circuit newCirc,
+                                                    VerilogCell cell,
+                                                    Map<String, PortDirection> dirs) throws CircuitException {
+        // Orden estable por nombre del puerto
+        List<String> names = new ArrayList<>(dirs.keySet());
+        Collections.sort(names);
+
+        List<String> ins = new ArrayList<>();
+        List<String> outs = new ArrayList<>();
+        List<String> inouts = new ArrayList<>();
+
+        for (String p : names) {
+            switch (dirs.getOrDefault(p, PortDirection.UNKNOWN)) {
+                case INPUT  -> ins.add(p);
+                case OUTPUT -> outs.add(p);
+                case INOUT  -> inouts.add(p);
+                default     -> { /* ignora unknown */ }
+            }
+        }
+
+        if (ins.isEmpty() && outs.isEmpty() && inouts.isEmpty()) {
+            return null; // nada útil → deja que el caller haga fallback
+        }
+
+        // Layout simple: IN/INOUT a la izquierda, OUT a la derecha
+        final int total = ins.size() + outs.size() + inouts.size();
+        final int spanY = Math.max(100, (total + 1) * GRID);
+        final int leftX = MIN_X + 40, rightX = MIN_X + 240;
+
+        int nLeft  = ins.size() + inouts.size();
+        int nRight = outs.size();
+
+        final int leftStep  = Math.max(GRID, spanY / Math.max(1, nLeft  + 1));
+        final int rightStep = Math.max(GRID, spanY / Math.max(1, nRight + 1));
+        int curLeftY  = MIN_Y + leftStep;
+        int curRightY = MIN_Y + rightStep;
+
+        CircuitMutation mu = new CircuitMutation(newCirc);
+        List<String> order = new ArrayList<>();
+
+        // INPUTS (izquierda)
+        for (String pname : ins) {
+            int w = Math.max(1, widthFromEndpoints(cell, pname));
+            addPinToMutation(mu, Location.create(leftX, curLeftY),
+                    /*isOutput*/ false, /*tri*/ false, w, pname,
+                    Direction.EAST, Direction.EAST);
+            order.add(pname);
+            curLeftY += leftStep;
+        }
+        // INOUTS (izquierda, tri-state activado)
+        for (String pname : inouts) {
+            int w = Math.max(1, widthFromEndpoints(cell, pname));
+            addPinToMutation(mu, Location.create(leftX, curLeftY),
+                    /*isOutput*/ true, /*tri*/ true, w, pname,
+                    Direction.EAST, Direction.EAST);
+            order.add(pname);
+            curLeftY += leftStep;
+        }
+        // OUTPUTS (derecha)
+        for (String pname : outs) {
+            int w = Math.max(1, widthFromEndpoints(cell, pname));
+            addPinToMutation(mu, Location.create(rightX, curRightY),
+                    /*isOutput*/ true, /*tri*/ false, w, pname,
+                    Direction.WEST, Direction.WEST);
+            order.add(pname);
+            curRightY += rightStep;
+        }
+
+        proj.doAction(mu.toAction(Strings.getter("addComponentAction", Pin.FACTORY.getDisplayGetter())));
+        return order;
+    }
 
     /**
      * Si no encontramos el módulo real, creamos pines “dummy”:
@@ -209,5 +292,41 @@ public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
                 return false; // asumimos vacío si no podemos inspeccionar
             }
         }
+    }
+
+    private static Map<String, PortDirection> directionsFromEndpoints(VerilogCell cell) {
+        Map<String, EnumSet<PortDirection>> acc = new LinkedHashMap<>();
+
+        for (PortEndpoint ep : cell.endpoints()) {
+            String p = ep.getPortName();
+            PortDirection d = (ep.getDirection() != null) ? ep.getDirection() : PortDirection.UNKNOWN;
+            acc.computeIfAbsent(p, __ -> EnumSet.noneOf(PortDirection.class)).add(d);
+        }
+
+        Map<String, PortDirection> out = new LinkedHashMap<>();
+        for (var e : acc.entrySet()) {
+            EnumSet<PortDirection> dirs = e.getValue();
+            dirs.remove(PortDirection.UNKNOWN);
+            PortDirection resolved;
+            if (dirs.isEmpty()) {
+                resolved = PortDirection.UNKNOWN;
+            } else if (dirs.size() == 1) {
+                resolved = dirs.iterator().next();
+            } else {
+                // Mezcla (poco probable) => trátalo como INOUT
+                resolved = PortDirection.INOUT;
+            }
+            out.put(e.getKey(), resolved);
+        }
+        return out;
+    }
+
+    private static int widthFromEndpoints(VerilogCell cell, String port) {
+        int maxIdx = -1;
+        for (PortEndpoint ep : cell.endpoints()) {
+            if (!port.equals(ep.getPortName())) continue;
+            maxIdx = Math.max(maxIdx, ep.getBitIndex());
+        }
+        return (maxIdx >= 0) ? (maxIdx + 1) : Math.max(1, safePortWidth(cell, port));
     }
 }

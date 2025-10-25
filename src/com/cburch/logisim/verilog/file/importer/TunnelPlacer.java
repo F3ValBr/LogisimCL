@@ -42,7 +42,8 @@ final class TunnelPlacer {
                Graphics g,
                SpecBuilder specs) {
 
-        record K(int x, int y, String lbl, boolean out) {}
+        // Deduplicación robusta: posición, especificación exacta (CSV), ancho, facing y si es salida
+        record K(int x, int y, String csvKey, int w, Direction facing, boolean out) {}
         Set<K> placed = new HashSet<>();
 
         // ===== TOP ports =====
@@ -60,11 +61,12 @@ final class TunnelPlacer {
             String label  = resolveNetname(mod, bitSpecs)
                     .orElse(pretty);
 
+            int w = Math.max(1, p.width());
             Location kLoc = ImporterUtils.Geom.stepFrom(anc.loc(), facing, -grid);
-            K key = new K(kLoc.getX(), kLoc.getY(), pretty, attrOutput);
+            String csvKey = String.join(",", bitSpecs);
+            K key = new K(kLoc.getX(), kLoc.getY(), csvKey, w, facing, attrOutput);
             if (!placed.add(key)) continue;
 
-            int w = Math.max(1, p.width());
             if (w <= 32) {
                 createBitLabeledTunnel(batch, anc.loc(), w, bitSpecs, label, facing, attrOutput);
             } else {
@@ -99,11 +101,13 @@ final class TunnelPlacer {
                 String label  = resolveNetname(mod, bitSpecs)
                         .orElse(pretty);
 
-                Direction facing = LayoutServices.facingByNearestBorder(LayoutServices.figureBounds(ih.component, g), pin);
-                boolean attrOutput = (SpecBuilder.dirForPort(cell, port) == SpecBuilder.Dir.IN);
+                Direction facing = LayoutServices.facingByNearestBorder(
+                        LayoutServices.figureBounds(ih.component, g), pin);
+                boolean attrOutput = SpecBuilder.isInput(cell, port) || facing == Direction.EAST;
 
                 Location kLoc = ImporterUtils.Geom.stepFrom(pin, facing, grid);
-                K key = new K(kLoc.getX(), kLoc.getY(), pretty, attrOutput);
+                String csvKey = String.join(",", bitSpecs);
+                K key = new K(kLoc.getX(), kLoc.getY(), csvKey, w, facing, attrOutput);
                 if (!placed.add(key)) continue;
 
                 if (w <= 32) {
@@ -133,7 +137,6 @@ final class TunnelPlacer {
                                         boolean attrOutput) {
         try {
             Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, -grid);
-
             batch.add(Wire.create(kLoc, mouth));
 
             BitLabeledTunnel bltFactory = BitLabeledTunnel.FACTORY;
@@ -141,11 +144,10 @@ final class TunnelPlacer {
             AttributeSet a = bltFactory.createAttributeSet();
             a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width)));
             a.setValue(BitLabeledTunnel.BIT_SPECS, String.join(",", bitSpecs));
-            a.setValue(BitLabeledTunnel.ATTR_OUTPUT, attrOutput && (facing != Direction.WEST));
+            a.setValue(BitLabeledTunnel.ATTR_OUTPUT, attrOutput);
             a.setValue(StdAttr.FACING, facing);
             if (label != null && !label.isBlank()) a.setValue(StdAttr.LABEL, label);
 
-            // Alinear pin: igual que tu lógica original
             Component probe = bltFactory.createComponent(Location.create(0, 0), a);
             EndData end0 = probe.getEnd(0);
             int offX = end0.getLocation().getX() - probe.getLocation().getX();
@@ -158,7 +160,6 @@ final class TunnelPlacer {
 
     /* ===================== Overflow helpers ===================== */
 
-    /** Divide en BLT(32) conectado + BLT(resto) sin conectar (solo aviso). */
     private void placeOverflowTunnels(ImportBatch batch,
                                       Location mouth,
                                       int width,
@@ -170,18 +171,15 @@ final class TunnelPlacer {
         final int lowCount = Math.min(LOW, wEff);
         final int rest = Math.max(0, wEff - lowCount);
 
-        // Normalizar lista de specs al menos a width elementos
         List<String> safe = new ArrayList<>(wEff);
         for (int i = 0; i < wEff; i++) {
             safe.add(i < specs.size() ? nonNullTrim(specs.get(i)) : "x");
         }
 
-        // 1) BLT(32) conectado
         List<String> lowSpecs = safe.subList(0, lowCount);
         String lblLow = SpecBuilder.makePrettyLabel(lowSpecs);
         createBitLabeledTunnel(batch, mouth, lowCount, lowSpecs, lblLow, facing, attrOutput);
 
-        // 2) BLT(resto) sin conectar (solo recordatorio visual)
         if (rest > 0) {
             List<String> restSpecs = new ArrayList<>(rest);
             for (int i = 0; i < rest; i++) restSpecs.add(safe.get(lowCount + i));
@@ -191,7 +189,6 @@ final class TunnelPlacer {
         }
     }
 
-    /** Coloca un BLT sin cable (decorativo/aviso). */
     private void createBltDecorated(ImportBatch batch,
                                     Location where,
                                     int width,
@@ -202,12 +199,12 @@ final class TunnelPlacer {
                                     String suffixNote) {
         try {
             BitLabeledTunnel bltFactory = BitLabeledTunnel.FACTORY;
-
             AttributeSet a = bltFactory.createAttributeSet();
             a.setValue(StdAttr.WIDTH, BitWidth.create(Math.max(1, width)));
             a.setValue(BitLabeledTunnel.BIT_SPECS, String.join(",", bitSpecs));
-            a.setValue(BitLabeledTunnel.ATTR_OUTPUT, attrOutput && (facing != Direction.WEST));
+            a.setValue(BitLabeledTunnel.ATTR_OUTPUT, attrOutput);
             a.setValue(StdAttr.FACING, facing);
+
             String lbl = (label == null ? "" : label.trim());
             if (!lbl.isEmpty() && suffixNote != null && !suffixNote.isBlank()) {
                 lbl = lbl + " " + suffixNote;
@@ -216,8 +213,6 @@ final class TunnelPlacer {
             }
             if (!lbl.isBlank()) a.setValue(StdAttr.LABEL, lbl);
 
-            // Colocar el componente de forma alineada en 'where' (como si fuera la boca),
-            // para que quede bien posicionado visualmente aunque no tenga cable.
             Component probe = bltFactory.createComponent(Location.create(0, 0), a);
             EndData end0 = probe.getEnd(0);
             int offX = end0.getLocation().getX() - probe.getLocation().getX();

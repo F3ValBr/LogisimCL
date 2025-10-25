@@ -4,6 +4,7 @@ import com.cburch.logisim.data.*;
 import com.cburch.logisim.verilog.comp.auxiliary.*;
 import com.cburch.logisim.verilog.comp.auxiliary.netconn.BitRef;
 import com.cburch.logisim.verilog.comp.auxiliary.netconn.Const0;
+import com.cburch.logisim.verilog.comp.auxiliary.netconn.PortDirection;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.file.ui.WarningCollector;
 import com.cburch.logisim.verilog.std.adapters.wordlvl.*;
@@ -18,10 +19,7 @@ final class SpecBuilder {
      */
     SpecBuilder(WarningCollector w) { this.warn = w; }
 
-    /** Direction of a port.*/
-    enum Dir { IN, OUT, INOUT }
-
-    /** Determines the direction of a port in a cell, based on its endpoints.
+    /** Determines the port direction for a given port in a Verilog cell.
      * If the port has both input and output endpoints, it is INOUT.
      * If it has only output endpoints, it is OUT.
      * If it has only input endpoints, it is IN.
@@ -30,28 +28,33 @@ final class SpecBuilder {
      * @param portName Port name to analyze.
      * @return Direction of the port.
      */
-    static Dir dirForPort(VerilogCell cell, String portName) {
-        boolean seenIn=false, seenOut=false;
+    static PortDirection dirForPort(VerilogCell cell, String portName) {
+        boolean seenIn = false, seenOut = false;
         for (PortEndpoint ep : cell.endpoints()) {
             if (!portName.equals(ep.getPortName())) continue;
-            switch (ep.getDirection()) {
-                case INPUT -> seenIn = true;
+            PortDirection d = ep.getDirection();
+            if (d == null) continue;
+            switch (d) {
+                case INOUT -> { return PortDirection.INOUT; }
+                case INPUT -> seenIn  = true;
                 case OUTPUT -> seenOut = true;
-                case INOUT -> { return Dir.INOUT; }
+                default -> { /* UNKNOWN → ignoramos */ }
             }
         }
-        if (seenIn && seenOut) return Dir.INOUT;
-        if (seenOut) return Dir.OUT;
-        return Dir.IN;
+        if (seenIn && seenOut) return PortDirection.INOUT;
+        if (seenOut)           return PortDirection.OUTPUT;
+        if (seenIn)            return PortDirection.INPUT;
+        return PortDirection.INPUT; // default previo
     }
 
-    /** Result of constant bits analysis. */
+    /** Helpers opcionales para hacer el código de llamada más legible. */
+    static boolean isInput (VerilogCell c, String p) { return dirForPort(c, p) == PortDirection.INPUT;  }
+    static boolean isOutput(VerilogCell c, String p) { return dirForPort(c, p) == PortDirection.OUTPUT; }
+    static boolean isInout (VerilogCell c, String p) { return dirForPort(c, p) == PortDirection.INOUT;  }
+
+    /** Resultado del análisis de constantes. */
     record ConstAnalysis(boolean allPresent, boolean all01, int acc) { }
 
-    /** Analyzes the constant bits of a port, given its endpoints by index.
-     * @param byIdx Array of endpoints by bit index.
-     * @return Analysis result indicating if all bits are present, if all are 0/1, and the accumulated value.
-     */
     static ConstAnalysis analyzeConstBits(PortEndpoint[] byIdx) {
         boolean allPresent = true, all01 = true;
         int acc = 0;
@@ -144,22 +147,17 @@ final class SpecBuilder {
                 if (s == null) continue;
                 bits++;
                 String t = s.trim();
-                if (t.equalsIgnoreCase("x") || t.equalsIgnoreCase("z")) {
-                    hasX = true;       // cualquier X/Z fuerza etiqueta "x"
-                    continue;
-                }
+                if (t.equalsIgnoreCase("x") || t.equalsIgnoreCase("z")) { hasX = true; continue; }
                 if (t.startsWith("N")) {
-                    try {
-                        ordered.add(Integer.parseInt(t.substring(1)));
-                    } catch (Exception ignore) { /* ignora tokens mal formados */ }
+                    try { ordered.add(Integer.parseInt(t.substring(1))); } catch (Exception ignore) {}
                 }
-                // "0" o "1" no aportan a la etiqueta visible aqui
             }
         }
 
-        if (hasX) return "X_UNDEF_" + bits;          // mezcla con nets o solo X ⇒ "x"
-        if (ordered.isEmpty()) return ""; // solo constantes 0/1 (o vacío) ⇒ sin etiqueta
+        if (hasX) return "X_UNDEF_" + bits;
+        if (ordered.isEmpty()) return "";
 
+        ordered.sort(Integer::compareTo);
         List<int[]> ranges = contiguousRanges(ordered);
         StringBuilder sb = new StringBuilder("N");
         for (int i = 0; i < ranges.size(); i++) {
@@ -182,10 +180,10 @@ final class SpecBuilder {
         int start = ordered.get(0), prev = start;
         for (int i=1;i<ordered.size();i++) {
             int cur = ordered.get(i);
-            if (cur == prev+1) prev = cur; else { out.add(new int[]{start, prev}); start = prev = cur; }
+            if (cur == prev+1) prev = cur;
+            else { out.add(new int[]{start, prev}); start = prev = cur; }
         }
         out.add(new int[]{start, prev});
         return out;
     }
 }
-

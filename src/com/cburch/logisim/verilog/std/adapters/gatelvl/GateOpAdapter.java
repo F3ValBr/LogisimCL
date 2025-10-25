@@ -39,7 +39,7 @@ public final class GateOpAdapter extends AbstractComponentAdapter
 
     @Override
     public boolean accepts(CellType t) {
-        return t != null && t.isGateLevel() && (t.isSimpleGate() || t.isComplexGate());
+        return t != null && t.isGateLevel() && (t.isSimpleGate() || t.isComplexGate() || t.isMultiplexer());
     }
 
     @Override

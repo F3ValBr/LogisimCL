@@ -5,6 +5,9 @@ import com.cburch.logisim.data.Location;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.specs.CellParams;
 import com.cburch.logisim.verilog.comp.specs.GenericCellParams;
+import com.cburch.logisim.verilog.comp.specs.gatelvl.GateOp;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.BinaryOp;
+import com.cburch.logisim.verilog.comp.specs.wordlvl.UnaryOp;
 import com.cburch.logisim.verilog.std.InstanceHandle;
 import com.cburch.logisim.verilog.std.adapters.gatelvl.GateOpComposer;
 import com.cburch.logisim.verilog.std.adapters.wordlvl.BinaryOpComposer;
@@ -34,23 +37,23 @@ public final class MacroRegistry {
         MacroRegistry reg = new MacroRegistry();
         UnaryOpComposer u = new UnaryOpComposer();
 
-        reg.register("$reduce_or", (ctx, cell, where) -> {
+        reg.register(UnaryOp.REDUCE_OR.yosysId(), (ctx, cell, where) -> {
             int w = guessUnaryWidth(cell.params());
             return u.buildReduceOrAsSubckt(ctx, cell, where, w);
         });
-        reg.register("$reduce_bool", (ctx, cell, where) -> {
+        reg.register(UnaryOp.REDUCE_BOOL.yosysId(), (ctx, cell, where) -> {
             int w = guessUnaryWidth(cell.params());
             return u.buildReduceOrAsSubckt(ctx, cell, where, w);
         });
-        reg.register("$reduce_and", (ctx, cell, where) -> {
+        reg.register(UnaryOp.REDUCE_AND.yosysId(), (ctx, cell, where) -> {
             int w = guessUnaryWidth(cell.params());
             return u.buildReduceAndAsSubckt(ctx, cell, where, w);
         });
-        reg.register("$reduce_xor", (ctx, cell, where) -> {
+        reg.register(UnaryOp.REDUCE_XOR.yosysId(), (ctx, cell, where) -> {
             int w = guessUnaryWidth(cell.params());
             return u.buildReduceXorAsSubckt(ctx, cell, where, w, true);
         });
-        reg.register("$reduce_xnor", (ctx, cell, where) -> {
+        reg.register(UnaryOp.REDUCE_XNOR.yosysId(), (ctx, cell, where) -> {
             int w = guessUnaryWidth(cell.params());
             return u.buildReduceXorAsSubckt(ctx, cell, where, w, false);
         });
@@ -61,19 +64,19 @@ public final class MacroRegistry {
         MacroRegistry reg = new MacroRegistry();
         BinaryOpComposer b = new BinaryOpComposer();
 
-        reg.register("$ne", (ctx, cell, where) -> {
+        reg.register(BinaryOp.NE.yosysId(), (ctx, cell, where) -> {
             int aw = guessWidth(cell.params(), "A_WIDTH", 1);
             int bw = guessWidth(cell.params(), "B_WIDTH", 1);
             return b.buildNeAsSubckt(ctx, cell, where, aw, bw);
         });
 
-        reg.register("$le", (ctx, cell, where) -> {
+        reg.register(BinaryOp.LE.yosysId(), (ctx, cell, where) -> {
             int aw = guessWidth(cell.params(), "A_WIDTH", 1);
             int bw = guessWidth(cell.params(), "B_WIDTH", 1);
             return b.buildLeAsSubckt(ctx, cell, where, aw, bw);
         });
 
-        reg.register("$ge", (ctx, cell, where) -> {
+        reg.register(BinaryOp.GE.yosysId(), (ctx, cell, where) -> {
             int aw = guessWidth(cell.params(), "A_WIDTH", 1);
             int bw = guessWidth(cell.params(), "B_WIDTH", 1);
             return b.buildGeAsSubckt(ctx, cell, where, aw, bw);
@@ -86,11 +89,11 @@ public final class MacroRegistry {
         MacroRegistry reg = new MacroRegistry();
         GateOpComposer g = new GateOpComposer();
 
-        reg.register("$_AOI3_", g::buildAOI3AsSubckt);
-        reg.register("$_AOI4_", g::buildAOI4AsSubckt);
-        reg.register("$_OAI3_", g::buildOAI3AsSubckt);
-        reg.register("$_OAI4_", g::buildOAI4AsSubckt);
-        reg.register("$_NMUX_", g::buildNMuxAsSubckt);
+        reg.register(GateOp.AOI3.yosysId(), g::buildAOI3AsSubckt);
+        reg.register(GateOp.AOI4.yosysId(), g::buildAOI4AsSubckt);
+        reg.register(GateOp.OAI3.yosysId(), g::buildOAI3AsSubckt);
+        reg.register(GateOp.OAI4.yosysId(), g::buildOAI4AsSubckt);
+        reg.register(GateOp.NMUX.yosysId(), g::buildNMuxAsSubckt);
 
         return reg;
     }

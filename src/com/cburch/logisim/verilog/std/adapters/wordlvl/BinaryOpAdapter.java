@@ -24,8 +24,6 @@ import com.cburch.logisim.verilog.comp.specs.wordlvl.BinaryOpParams;
 import com.cburch.logisim.verilog.std.*;
 import com.cburch.logisim.verilog.std.adapters.MacroRegistry;
 import com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter;
-import com.cburch.logisim.verilog.std.macrocomponents.ComposeCtx;
-import com.cburch.logisim.verilog.std.macrocomponents.Factories;
 
 import java.awt.Graphics;
 import java.util.Map;
@@ -54,15 +52,8 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
         }
 
         // ¿hay receta macro? -> compón en el circuito destino (no el del canvas)
-        MacroRegistry.Recipe recipe = registry.find(cell.type().typeId());
-        if (recipe != null) {
-            var ctx = new ComposeCtx(proj, circ, g, Factories.warmup(proj));
-            try {
-                return recipe.build(ctx, cell, where);
-            } catch (CircuitException e) {
-                throw new IllegalStateException("No se pudo componer " + op + ": " + e.getMessage(), e);
-            }
-        }
+        InstanceHandle composed = tryComposeWithMacroOrNull(proj, circ, g, cell, where, registry);
+        if (composed != null) return composed;
 
         // 1) Elegir factory según operación ($and/$or/$xor/$xnor → Gates; $add/$sub/$mul → Arithmetic)
         LibFactory lf = pickFactoryOrNull(proj, op);

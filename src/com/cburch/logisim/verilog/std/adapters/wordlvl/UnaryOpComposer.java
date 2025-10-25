@@ -30,7 +30,7 @@ public final class UnaryOpComposer extends BaseComposer {
     /** $reduce_or/$reduce_bool(A) := NOT( A == 0 ). */
     public InstanceHandle buildReduceOrAsSubckt(ComposeCtx ctx, VerilogCell cell, Location where, int aWidth)
             throws CircuitException {
-        require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate"); require(ctx.fx.pinF, "Pin");
+        require(ctx.fx.cmpF, "Comparator"); require(ctx.fx.notF, "NOT Gate"); require(ctx.fx.pinF, "Pin");
         final String name = MacroSubcktKit.macroName("reduce_or", aWidth);
 
         UnaryOpParams p = new UnaryOpParams(UnaryOp.REDUCE_OR, cell.params().asMap());
@@ -42,7 +42,7 @@ public final class UnaryOpComposer extends BaseComposer {
                 Component pinA = addPin(in, "A", false, aWidth, Location.create(cmpLoc.getX()-80, cmpLoc.getY()-10));
                 Component pinY = addPin(in, "Y", true, 1, cmpLoc.translate(30,0));
 
-                Component cmp = add(in, in.fx.cmp, cmpLoc, attrsWithWidthAndLabel(in.fx.cmp, aWidth, "A==0"));
+                Component cmp = add(in, in.fx.cmpF, cmpLoc, attrsWithWidthAndLabel(in.fx.cmpF, aWidth, "A==0"));
                 setComparatorSignMode(cmp.getAttributeSet(), p.aSigned());
 
                 if (in.fx.constF != null) {
@@ -67,7 +67,7 @@ public final class UnaryOpComposer extends BaseComposer {
     /** $reduce_and(A) := (A == 2^N - 1). */
     public InstanceHandle buildReduceAndAsSubckt(ComposeCtx ctx, VerilogCell cell, Location where, int aWidth)
             throws CircuitException {
-        require(ctx.fx.cmp, "Comparator"); require(ctx.fx.pinF, "Pin");
+        require(ctx.fx.cmpF, "Comparator"); require(ctx.fx.pinF, "Pin");
         final String name = MacroSubcktKit.macroName("reduce_and", aWidth);
 
         UnaryOpParams p = new UnaryOpParams(UnaryOp.REDUCE_AND, cell.params().asMap());
@@ -79,7 +79,7 @@ public final class UnaryOpComposer extends BaseComposer {
                 Component pinA = addPin(in, "A", false, aWidth, cmpLoc.translate(-80,-10));
                 Component pinY = addPin(in, "Y", true, 1, cmpLoc);
 
-                Component cmp = add(in, in.fx.cmp, cmpLoc, attrsWithWidthAndLabel(in.fx.cmp, aWidth, "A==all1"));
+                Component cmp = add(in, in.fx.cmpF, cmpLoc, attrsWithWidthAndLabel(in.fx.cmpF, aWidth, "A==all1"));
                 setComparatorSignMode(cmp.getAttributeSet(), p.aSigned());
                 if (in.fx.constF != null) {
                     AttributeSet k = in.fx.constF.createAttributeSet();

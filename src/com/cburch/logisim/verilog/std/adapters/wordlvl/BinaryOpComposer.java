@@ -23,7 +23,7 @@ public final class BinaryOpComposer extends BaseComposer {
     /** Y = (A != B) = NOT (A == B) */
     public InstanceHandle buildNeAsSubckt(ComposeCtx ctx, VerilogCell cell, Location where,
                                           int aWidth, int bWidth) throws CircuitException {
-        require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate");
+        require(ctx.fx.cmpF, "Comparator"); require(ctx.fx.notF, "NOT Gate");
         final String name = MacroSubcktKit.macroName("ne(!=)", aWidth, bWidth);
 
         BinaryOpParams p = new BinaryOpParams(BinaryOp.NE, cell.params().asMap());
@@ -37,8 +37,8 @@ public final class BinaryOpComposer extends BaseComposer {
                 Component pinY = addPin(in, "Y", true, 1, cLoc.translate(60,    0));
 
                 // Comparator
-                Component cmp = add(in, in.fx.cmp, cLoc,
-                        attrsWithWidthAndLabel(in.fx.cmp, Math.max(aWidth, bWidth), "CMP"));
+                Component cmp = add(in, in.fx.cmpF, cLoc,
+                        attrsWithWidthAndLabel(in.fx.cmpF, Math.max(aWidth, bWidth), "CMP"));
 
                 // 👉 Setear signo (usa los flags de BinaryOpParams)
                 setComparatorSignMode(cmp.getAttributeSet(), p.aSigned() || p.bSigned());
@@ -68,7 +68,7 @@ public final class BinaryOpComposer extends BaseComposer {
     /** Y = (A <= B) = (A < B) OR (A == B) */
     public InstanceHandle buildLeAsSubckt(ComposeCtx ctx, VerilogCell cell, Location where,
                                           int aWidth, int bWidth) throws CircuitException {
-        require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate");
+        require(ctx.fx.cmpF, "Comparator"); require(ctx.fx.notF, "NOT Gate");
         final String name = MacroSubcktKit.macroName("le(<=)", aWidth, bWidth);
 
         BinaryOpParams p = new BinaryOpParams(BinaryOp.LE, cell.params().asMap());
@@ -82,8 +82,8 @@ public final class BinaryOpComposer extends BaseComposer {
                 Component pinY = addPin(in, "Y", true, 1, cLoc.translate(60,  -10));
 
                 // Comparator
-                Component cmp = add(in, in.fx.cmp, cLoc,
-                        attrsWithWidthAndLabel(in.fx.cmp, Math.max(aWidth, bWidth), "CMP"));
+                Component cmp = add(in, in.fx.cmpF, cLoc,
+                        attrsWithWidthAndLabel(in.fx.cmpF, Math.max(aWidth, bWidth), "CMP"));
 
                 // 👉 Setear signo (usa los flags de BinaryOpParams)
                 setComparatorSignMode(cmp.getAttributeSet(), p.aSigned() || p.bSigned());
@@ -113,7 +113,7 @@ public final class BinaryOpComposer extends BaseComposer {
     /** Y = (A >= B) = (A > B) OR (A == B) */
     public InstanceHandle buildGeAsSubckt(ComposeCtx ctx, VerilogCell cell, Location where,
                                           int aWidth, int bWidth) throws CircuitException {
-        require(ctx.fx.cmp, "Comparator"); require(ctx.fx.notF, "NOT Gate");
+        require(ctx.fx.cmpF, "Comparator"); require(ctx.fx.notF, "NOT Gate");
         final String name = MacroSubcktKit.macroName("ge(>=)", aWidth, bWidth);
 
         BinaryOpParams p = new BinaryOpParams(BinaryOp.GE, cell.params().asMap());
@@ -127,8 +127,8 @@ public final class BinaryOpComposer extends BaseComposer {
                 Component pinY = addPin(in, "Y", true, 1, cLoc.translate(60,  10));
 
                 // Comparator
-                Component cmp = add(in, in.fx.cmp, cLoc,
-                        attrsWithWidthAndLabel(in.fx.cmp, Math.max(aWidth, bWidth), "CMP"));
+                Component cmp = add(in, in.fx.cmpF, cLoc,
+                        attrsWithWidthAndLabel(in.fx.cmpF, Math.max(aWidth, bWidth), "CMP"));
 
                 // 👉 Setear signo (usa los flags de BinaryOpParams)
                 setComparatorSignMode(cmp.getAttributeSet(), p.aSigned() || p.bSigned());

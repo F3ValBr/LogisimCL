@@ -6,6 +6,7 @@ import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.specs.CellParams;
 import com.cburch.logisim.verilog.comp.specs.GenericCellParams;
 import com.cburch.logisim.verilog.std.InstanceHandle;
+import com.cburch.logisim.verilog.std.adapters.gatelvl.GateOpComposer;
 import com.cburch.logisim.verilog.std.adapters.wordlvl.BinaryOpComposer;
 import com.cburch.logisim.verilog.std.adapters.wordlvl.UnaryOpComposer;
 import com.cburch.logisim.verilog.std.macrocomponents.ComposeCtx;
@@ -77,6 +78,19 @@ public final class MacroRegistry {
             int bw = guessWidth(cell.params(), "B_WIDTH", 1);
             return b.buildGeAsSubckt(ctx, cell, where, aw, bw);
         });
+
+        return reg;
+    }
+
+    public static MacroRegistry bootGateDefaults() {
+        MacroRegistry reg = new MacroRegistry();
+        GateOpComposer g = new GateOpComposer();
+
+        reg.register("$_AOI3_", g::buildAOI3AsSubckt);
+        reg.register("$_AOI4_", g::buildAOI4AsSubckt);
+        reg.register("$_OAI3_", g::buildOAI3AsSubckt);
+        reg.register("$_OAI4_", g::buildOAI4AsSubckt);
+        reg.register("$_NMUX_", g::buildNMuxAsSubckt);
 
         return reg;
     }

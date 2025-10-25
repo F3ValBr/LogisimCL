@@ -8,6 +8,10 @@ import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.data.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.verilog.comp.auxiliary.CellType;
+import com.cburch.logisim.verilog.comp.impl.VerilogCell;
+import com.cburch.logisim.verilog.std.adapters.MacroRegistry;
+import com.cburch.logisim.verilog.std.macrocomponents.ComposeCtx;
+import com.cburch.logisim.verilog.std.macrocomponents.Factories;
 
 import java.awt.*;
 
@@ -161,4 +165,31 @@ public abstract class AbstractComponentAdapter implements ComponentAdapter {
 
         return middle + "_" + last;
     }
+
+    /** Intenta componer la celda usando una receta de MacroRegistry.
+     *  Si no existe receta para el typeId, devuelve null.
+     *  Si falla la composición, lanza IllegalStateException.
+     */
+    protected InstanceHandle tryComposeWithMacroOrNull(
+            Project proj,
+            Circuit circ,
+            Graphics g,
+            VerilogCell cell,
+            Location where,
+            MacroRegistry registry
+    ) {
+        if (registry == null || cell == null || cell.type() == null) return null;
+
+        MacroRegistry.Recipe recipe = registry.find(cell.type().typeId());
+        if (recipe == null) return null;
+
+        var ctx = new ComposeCtx(proj, circ, g, Factories.warmup(proj));
+        try {
+            return recipe.build(ctx, cell, where);
+        } catch (CircuitException e) {
+            throw new IllegalStateException(
+                    "No se pudo componer " + cell.type().typeId() + ": " + e.getMessage(), e);
+        }
+    }
+
 }

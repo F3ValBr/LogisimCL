@@ -1,8 +1,10 @@
 package com.cburch.logisim.verilog.comp;
 
 import com.cburch.logisim.verilog.comp.factories.ModuleInstanceFactory;
+import com.cburch.logisim.verilog.comp.factories.gatelvl.*;
 import com.cburch.logisim.verilog.comp.factories.wordlvl.*;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
+import com.cburch.logisim.verilog.comp.specs.gatelvl.GateOp;
 import com.cburch.logisim.verilog.comp.specs.wordlvl.*;
 
 import java.util.*;
@@ -15,7 +17,7 @@ public class CellFactoryRegistry {
     private final VerilogCellFactory muxFactory    = new MuxOpFactory();
     private final VerilogCellFactory registerFactory = new RegisterOpFactory();
     private final VerilogCellFactory memoryFactory = new MemoryOpFactory();
-    //private final VerilogCellFactory gateFactory   = new GateOpFactory();
+    private final VerilogCellFactory gateFactory   = new GateOpFactory();
     private final VerilogCellFactory moduleFactory = new ModuleInstanceFactory();
 
     public void register(String typeId, VerilogCellFactory factory) {
@@ -45,14 +47,13 @@ public class CellFactoryRegistry {
         }
 
         // 3) Gate-level conocidos ($_...)
-        /**
         if (typeId.startsWith("$_")) {
             if (GateOp.isGateTypeId(typeId)) {
                 return gateFactory.create(name, typeId, parameters, attributes, portDirections, connections);
             }
             // gate desconocido → MÓDULO
             return moduleFactory.create(name, typeId, parameters, attributes, portDirections, connections);
-        }*/
+        }
 
         // 4) Word-level ($...)
         if (typeId.startsWith("$")) {

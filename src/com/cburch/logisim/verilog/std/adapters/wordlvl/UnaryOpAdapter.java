@@ -21,8 +21,6 @@ import com.cburch.logisim.verilog.comp.specs.wordlvl.UnaryOpParams;
 import com.cburch.logisim.verilog.std.*;
 import com.cburch.logisim.verilog.std.adapters.MacroRegistry;
 import com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter;
-import com.cburch.logisim.verilog.std.macrocomponents.ComposeCtx;
-import com.cburch.logisim.verilog.std.macrocomponents.Factories;
 
 import java.awt.Graphics;
 import java.util.Map;
@@ -53,11 +51,8 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
         UnaryOp op = UnaryOp.fromYosys(cell.type().typeId());
         try {
             // 1) Receta compuesta (si existe)
-            MacroRegistry.Recipe recipe = registry.find(cell.type().typeId());
-            if (recipe != null) {
-                var ctx = new ComposeCtx(proj, circ, g, Factories.warmup(proj));
-                return recipe.build(ctx, cell, where);
-            }
+            InstanceHandle composed = tryComposeWithMacroOrNull(proj, circ, g, cell, where, registry);
+            if (composed != null) return composed;
 
             // 2) Factory nativo (+ library) si hay
             LibFactory lf = pickFactory(proj, op);

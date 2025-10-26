@@ -90,6 +90,8 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                 configureShifterAttributes(attrs, op, cell);
             }
 
+            if (op == BinaryOp.EQX) setBooleanByName(attrs, "strictEq", true);
+
             Component comp = addComponent(proj, circ, g, lf.factory, where, attrs);
 
             // Mapa nombre->índice específico de ESTA instancia (usa library + factory + instance)
@@ -97,9 +99,9 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                 case COMPARE -> {
                     // Selecciona cuál salida del Comparator mapeamos como “Y”
                     BuiltinPortMaps.ComparatorOut outSel = switch (op) {
-                        case EQ -> BuiltinPortMaps.ComparatorOut.EQ;
-                        case LT -> BuiltinPortMaps.ComparatorOut.LT;
-                        case GT -> BuiltinPortMaps.ComparatorOut.GT;
+                        case EQ,EQX -> BuiltinPortMaps.ComparatorOut.EQ;
+                        case LT     -> BuiltinPortMaps.ComparatorOut.LT;
+                        case GT     -> BuiltinPortMaps.ComparatorOut.GT;
                         // LE/GE/NE los compones fuera (ya tienes macros); aquí default a EQ
                         default -> BuiltinPortMaps.ComparatorOut.EQ;
                     };

@@ -15,6 +15,7 @@ import com.cburch.logisim.verilog.std.macrocomponents.MacroSubcktKit;
 import java.util.List;
 import java.util.function.BiConsumer;
 
+import static com.cburch.logisim.verilog.std.AbstractComponentAdapter.setBooleanByName;
 import static com.cburch.logisim.verilog.std.adapters.ComponentComposer.attrsWithWidthAndLabel;
 
 public final class BinaryOpComposer extends BaseComposer {
@@ -22,7 +23,7 @@ public final class BinaryOpComposer extends BaseComposer {
 
     /** Y = (A != B) = NOT (A == B) */
     public InstanceHandle buildNeAsSubckt(ComposeCtx ctx, VerilogCell cell, Location where,
-                                          int aWidth, int bWidth) throws CircuitException {
+                                          int aWidth, int bWidth, boolean strict) throws CircuitException {
         require(ctx.fx.cmpF, "Comparator"); require(ctx.fx.notF, "NOT Gate");
         final String name = MacroSubcktKit.macroName("ne(!=)", aWidth, bWidth);
 
@@ -39,6 +40,8 @@ public final class BinaryOpComposer extends BaseComposer {
                 // Comparator
                 Component cmp = add(in, in.fx.cmpF, cLoc,
                         attrsWithWidthAndLabel(in.fx.cmpF, Math.max(aWidth, bWidth), "CMP"));
+
+                setBooleanByName(cmp.getAttributeSet(), "strictEq", strict);
 
                 // 👉 Setear signo (usa los flags de BinaryOpParams)
                 setComparatorSignMode(cmp.getAttributeSet(), p.aSigned() || p.bSigned());

@@ -25,6 +25,7 @@ import java.awt.image.BufferedImage;
 import java.util.*;
 import java.util.List;
 
+import static com.cburch.logisim.verilog.file.importer.ImporterUtils.Geom.snap;
 import static com.cburch.logisim.verilog.file.importer.VerilogJsonImporter.*;
 
 public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
@@ -114,7 +115,33 @@ public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
         }
     }
 
-    /* -------------------- Fallback: mitad IN / mitad OUT -------------------- */
+    // === helpers de grid/espaciado ===
+    private static final int MIN_GAP = 5 * GRID; // separación mínima entre pines
+    private static final int TOP_PAD = 2 * GRID; // margen superior de columna
+    private static final int BOT_PAD = 2 * GRID; // margen inferior de columna
+
+    private static int roundUpToGrid(int v) {
+        int g = Math.max(1, GRID);
+        int r = v % g;
+        return (r == 0) ? v : (v + (g - r));
+    }
+
+    /** Calcula un step vertical ≥ MIN_GAP y múltiplo del grid. */
+    private static int calcStep(int span, int count) {
+        if (count <= 0) return MIN_GAP;
+        // espacio disponible para separaciones entre (count+1) huecos (con márgenes)
+        int base = span / (count + 1);
+        int step = Math.max(MIN_GAP, base);
+        return roundUpToGrid(step);
+    }
+
+    /** Y central del i-ésimo pin (1..count) dentro de una columna con márgenes/step dados. */
+    private static int yAtIndex(int startY, int step, int index1based) {
+        return startY + index1based * step;
+    }
+
+
+    /* -------------------- Distribución de pins de entrada y salida -------------------- */
 
     private List<String> populatePinsFromDirections(Project proj, Circuit newCirc,
                                                     VerilogCell cell,
@@ -137,51 +164,65 @@ public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
         }
 
         if (ins.isEmpty() && outs.isEmpty() && inouts.isEmpty()) {
-            return null; // nada útil → deja que el caller haga fallback
+            return null; // nada útil → fallback
         }
 
-        // Layout simple: IN/INOUT a la izquierda, OUT a la derecha
+        // === Layout
         final int total = ins.size() + outs.size() + inouts.size();
-        final int spanY = Math.max(100, (total + 1) * GRID);
-        final int leftX = MIN_X + 40, rightX = MIN_X + 240;
 
-        int nLeft  = ins.size() + inouts.size();
-        int nRight = outs.size();
+        // Altura de la “pista” vertical: proporcional a cantidad, pero con pad, y múltiplo del grid
+        int rawSpan = TOP_PAD + (total * MIN_GAP) + BOT_PAD;
+        final int spanY = roundUpToGrid(Math.max(100, rawSpan));
 
-        final int leftStep  = Math.max(GRID, spanY / Math.max(1, nLeft  + 1));
-        final int rightStep = Math.max(GRID, spanY / Math.max(1, nRight + 1));
-        int curLeftY  = MIN_Y + leftStep;
-        int curRightY = MIN_Y + rightStep;
+        // Columnas (ajusta si quieres abrir más el ancho)
+        final int leftX  = snap(MIN_X + 40);
+        final int rightX = snap(MIN_X + 240);
+
+        // Conteos por columna (IN y INOUT a la izquierda, OUT a la derecha)
+        final int nLeft  = ins.size() + inouts.size();
+        final int nRight = outs.size();
+
+        // Steps verticales (si una columna está vacía, usa MIN_GAP para evitar /0)
+        final int stepLeft  = calcStep(spanY,  Math.max(1, nLeft));
+        final int stepRight = calcStep(spanY,  Math.max(1, nRight));
+
+        // Y base (parte superior de la pista)
+        final int startYLeft  = snap(MIN_Y + TOP_PAD);
+        final int startYRight = snap(MIN_Y + TOP_PAD);
 
         CircuitMutation mu = new CircuitMutation(newCirc);
         List<String> order = new ArrayList<>();
 
+        int idxL = 0;
+
         // INPUTS (izquierda)
         for (String pname : ins) {
             int w = Math.max(1, widthFromEndpoints(cell, pname));
-            addPinToMutation(mu, Location.create(leftX, curLeftY),
+            int y = snap(yAtIndex(startYLeft, stepLeft, ++idxL));
+            addPinToMutation(mu, Location.create(leftX, y),
                     /*isOutput*/ false, /*tri*/ false, w, pname,
                     Direction.EAST, Direction.EAST);
             order.add(pname);
-            curLeftY += leftStep;
         }
         // INOUTS (izquierda, tri-state activado)
         for (String pname : inouts) {
             int w = Math.max(1, widthFromEndpoints(cell, pname));
-            addPinToMutation(mu, Location.create(leftX, curLeftY),
+            int y = snap(yAtIndex(startYLeft, stepLeft, ++idxL));
+            addPinToMutation(mu, Location.create(leftX, y),
                     /*isOutput*/ true, /*tri*/ true, w, pname,
                     Direction.EAST, Direction.EAST);
             order.add(pname);
-            curLeftY += leftStep;
         }
+
         // OUTPUTS (derecha)
+        int idxR = 0;
         for (String pname : outs) {
             int w = Math.max(1, widthFromEndpoints(cell, pname));
-            addPinToMutation(mu, Location.create(rightX, curRightY),
+            int y = snap(yAtIndex(startYRight, stepRight, ++idxR));
+            addPinToMutation(mu, Location.create(rightX, y),
                     /*isOutput*/ true, /*tri*/ false, w, pname,
                     Direction.WEST, Direction.WEST);
             order.add(pname);
-            curRightY += rightStep;
         }
 
         proj.doAction(mu.toAction(Strings.getter("addComponentAction", Pin.FACTORY.getDisplayGetter())));
@@ -200,35 +241,47 @@ public final class ModuleBlackBoxAdapter extends AbstractComponentAdapter {
         names.sort(String::compareTo);
 
         int n = names.size();
-        int nIn  = n / 2;           // mitad inferior
-
+        int nIn  = n / 2; // primera mitad IN, segunda mitad OUT
         List<String> inNames  = new ArrayList<>(names.subList(0, nIn));
         List<String> outNames = new ArrayList<>(names.subList(nIn, n));
 
-        // Layout básico
-        final int spanY = Math.max(100, (n + 1) * GRID);
-        final int leftX = MIN_X + 40, rightX = MIN_X + 240;
-        final int inStep  = Math.max(GRID, spanY / Math.max(1, inNames.size()  + 1));
-        final int outStep = Math.max(GRID, spanY / Math.max(1, outNames.size() + 1));
-        int curInY = MIN_Y + inStep, curOutY = MIN_Y + outStep;
+        // “Pista” vertical
+        int rawSpan = TOP_PAD + (n * MIN_GAP) + BOT_PAD;
+        final int spanY  = roundUpToGrid(Math.max(100, rawSpan));
+
+        // Columnas
+        final int leftX  = snap(MIN_X + 40);
+        final int rightX = snap(MIN_X + 240);
+
+        // Steps
+        final int stepIn  = calcStep(spanY, Math.max(1, inNames.size()));
+        final int stepOut = calcStep(spanY, Math.max(1, outNames.size()));
+
+        // Y base
+        final int startYIn  = snap(MIN_Y + TOP_PAD);
+        final int startYOut = snap(MIN_Y + TOP_PAD);
 
         CircuitMutation mu = new CircuitMutation(newCirc);
         List<String> order = new ArrayList<>();
 
         // Inputs (izquierda)
+        int kIn = 0;
         for (String pname : inNames) {
             int w = Math.max(1, safePortWidth(cell, pname));
-            addPinToMutation(mu, Location.create(leftX, curInY), false, false, w, pname, Direction.EAST, Direction.EAST);
+            int y = snap(yAtIndex(startYIn, stepIn, ++kIn));
+            addPinToMutation(mu, Location.create(leftX, y),
+                    false, false, w, pname, Direction.EAST, Direction.EAST);
             order.add(pname);
-            curInY += inStep;
         }
 
         // Outputs (derecha)
+        int kOut = 0;
         for (String pname : outNames) {
             int w = Math.max(1, safePortWidth(cell, pname));
-            addPinToMutation(mu, Location.create(rightX, curOutY), true, false, w, pname, Direction.WEST, Direction.WEST);
+            int y = snap(yAtIndex(startYOut, stepOut, ++kOut));
+            addPinToMutation(mu, Location.create(rightX, y),
+                    true, false, w, pname, Direction.WEST, Direction.WEST);
             order.add(pname);
-            curOutY += outStep;
         }
 
         proj.doAction(mu.toAction(Strings.getter("addComponentAction", Pin.FACTORY.getDisplayGetter())));

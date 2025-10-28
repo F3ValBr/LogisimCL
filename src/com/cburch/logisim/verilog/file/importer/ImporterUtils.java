@@ -26,16 +26,18 @@ import java.awt.image.BufferedImage;
 import java.util.*;
 import java.util.List;
 
+import static com.cburch.logisim.verilog.file.importer.VerilogJsonImporter.GRID;
+
 public class ImporterUtils {
 
-    static final class Geom {
+    public static final class Geom {
         /** Creates a scratch Graphics context for measuring components. */
         static Graphics makeScratchGraphics() {
             return new BufferedImage(1,1, BufferedImage.TYPE_INT_ARGB).getGraphics();
         }
 
-        /** Rounds v down to the nearest multiple of 10. */
-        static int snap(int v){ return (v/10)*10; }
+        /** Rounds v down to the nearest multiple of GRID. */
+        public static int snap(int v){ return (v/GRID)*GRID; }
 
         /** Returns the location obtained by moving 'step' units from 'base' in 'facing' direction. */
         static Location stepFrom(Location base, Direction facing, int step) {
@@ -359,7 +361,7 @@ public class ImporterUtils {
 
             // 4) Fallback: sin netname aplicable
             String pretty = SpecBuilder.makePrettyLabel(bitSpecs);
-            if (pretty != null && !pretty.isBlank()) return Optional.of(pretty);
+            if (!pretty.isBlank()) return Optional.of(pretty);
 
             return Optional.empty();
         }

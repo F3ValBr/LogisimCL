@@ -28,7 +28,7 @@ final class SpecBuilder {
      * @param portName Port name to analyze.
      * @return Direction of the port.
      */
-    static PortDirection dirForPort(VerilogCell cell, String portName) {
+    static PortDirection dirForPort(VerilogCell cell, String portName, Direction facingDir) {
         boolean seenIn = false, seenOut = false;
         for (PortEndpoint ep : cell.endpoints()) {
             if (!portName.equals(ep.getPortName())) continue;
@@ -44,13 +44,13 @@ final class SpecBuilder {
         if (seenIn && seenOut) return PortDirection.INOUT;
         if (seenOut)           return PortDirection.OUTPUT;
         if (seenIn)            return PortDirection.INPUT;
-        return PortDirection.INPUT; // default previo
+        return facingDir.equals(Direction.WEST) ? PortDirection.OUTPUT : PortDirection.INPUT;
     }
 
     /** Helpers opcionales para hacer el código de llamada más legible. */
-    static boolean isInput (VerilogCell c, String p) { return dirForPort(c, p) == PortDirection.INPUT;  }
-    static boolean isOutput(VerilogCell c, String p) { return dirForPort(c, p) == PortDirection.OUTPUT; }
-    static boolean isInout (VerilogCell c, String p) { return dirForPort(c, p) == PortDirection.INOUT;  }
+    static boolean isInput (VerilogCell c, String p, Direction fd) { return dirForPort(c, p, fd) == PortDirection.INPUT;  }
+    static boolean isOutput(VerilogCell c, String p, Direction fd) { return dirForPort(c, p, fd) == PortDirection.OUTPUT; }
+    static boolean isInout (VerilogCell c, String p, Direction fd) { return dirForPort(c, p, fd) == PortDirection.INOUT;  }
 
     /** Resultado del análisis de constantes. */
     record ConstAnalysis(boolean allPresent, boolean all01, int acc) { }

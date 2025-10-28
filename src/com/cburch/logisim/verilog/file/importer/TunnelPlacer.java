@@ -103,7 +103,7 @@ final class TunnelPlacer {
 
                 Direction facing = LayoutServices.facingByNearestBorder(
                         LayoutServices.figureBounds(ih.component, g), pin);
-                boolean attrOutput = SpecBuilder.isInput(cell, port) || facing == Direction.EAST;
+                boolean attrOutput = SpecBuilder.isInput(cell, port, facing);
 
                 Location kLoc = ImporterUtils.Geom.stepFrom(pin, facing, grid);
                 String csvKey = String.join(",", bitSpecs);

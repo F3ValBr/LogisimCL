@@ -191,5 +191,4 @@ public abstract class AbstractComponentAdapter implements ComponentAdapter {
                     "No se pudo componer " + cell.type().typeId() + ": " + e.getMessage(), e);
         }
     }
-
 }

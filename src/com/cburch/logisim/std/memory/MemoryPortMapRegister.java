@@ -8,6 +8,7 @@ import com.cburch.logisim.std.PortMapRegister;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.std.BuiltinPortMaps;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class MemoryPortMapRegister implements PortMapRegister {
@@ -18,15 +19,19 @@ public final class MemoryPortMapRegister implements PortMapRegister {
 
         BuiltinPortMaps.registerResolverByName(memoryLib.getName(), "Register",
                 MemoryPortMapRegister::resolveRegisterPorts);
-        BuiltinPortMaps.registerByName(memoryLib.getName(), "RAM",
-                Map.of("addr", 1, "dataIn", 2, "dataOut", 0, "we", 3, "clk", 4));
+        BuiltinPortMaps.registerResolverByName(memoryLib.getName(), "RAM",
+                MemoryPortMapRegister::resolveRamPorts);
         BuiltinPortMaps.registerByName(memoryLib.getName(), "ROM",
-                Map.of("addr", 1, "dataOut", 0, "clk", 2));
+                Map.of("$1", Mem.ADDR, "addr", Mem.ADDR, "A", Mem.ADDR,
+                        "$2", Mem.DATA, "dataOut", Mem.DATA, "Q", Mem.DATA
+                ));
         BuiltinPortMaps.registerByName(memoryLib.getName(), "S-R Flip-Flop",
                 Map.of("countOut", 0, "enable", 1, "load", 2, "clear", 3, "loadValue", 4, "clk", 5));
     }
 
-    /** Replica la política de índices de tu Register.recomputePorts(). */
+    /* ============================
+       Resolver para Register
+       ============================ */
     private static Map<String,Integer> resolveRegisterPorts(Component component) {
         AttributeSet attrs = component.getAttributeSet();
 
@@ -51,16 +56,88 @@ public final class MemoryPortMapRegister implements PortMapRegister {
         }
 
         // Construye nombre → índice sólo con los presentes
-        java.util.LinkedHashMap<String,Integer> m = new java.util.LinkedHashMap<>();
+        LinkedHashMap<String,Integer> m = new LinkedHashMap<>();
+        // nombres principales
         m.put("Q",   OUT);
         m.put("D",   IN);
         m.put("CLK", CK);
+        // alias en minúsculas
+        m.put("q",   OUT);
+        m.put("d",   IN);
+        m.put("clk", CK);
+
         if (RST != null) {
             m.put("RST", RST);
-            m.put("ARST", RST); // Alias
-            m.put("SRST", RST); // Alias
+            m.put("ARST", RST);
+            m.put("SRST", RST);
+            m.put("rst", RST); m.put("arst", RST); m.put("srst", RST);
+            m.put("CLR", RST); m.put("clr",  RST);
         }
-        if (EN  != null) m.put("EN",  EN);
+        if (EN  != null) {
+            m.put("EN", EN);
+            m.put("en", EN);
+            m.put("ENABLE", EN);
+            m.put("enable", EN);
+        }
+        return m;
+    }
+
+    /* ============================
+       Resolver para RAM (DINÁMICO)
+       ============================ */
+    private static Map<String,Integer> resolveRamPorts(Component component) {
+        AttributeSet attrs = component.getAttributeSet();
+
+        int idx = Mem.MEM_INPUTS;
+
+        Object bus = attrs.getValue(Ram.ATTR_BUS);
+        boolean asynch   = Ram.BUS_ASYNCH.equals(bus);
+        boolean separate = Ram.BUS_SEPARATE.equals(bus);
+        boolean clear    = Boolean.TRUE.equals(attrs.getValue(Ram.CLEAR_PIN));
+
+        final int OE  = idx++;
+        final int CLR = clear   ? idx++ : -1;
+        final int CLK = !asynch ? idx++ : -1;
+        final int WE  = separate ? idx++ : -1;
+        final int DIN = separate ? idx++ : -1;
+
+        // ---- Mapear nombres lógicos → índices reales ----
+        LinkedHashMap<String,Integer> m = new LinkedHashMap<>();
+
+        // Estándar de Mem:
+        m.put("$3", Mem.ADDR);  m.put("addr",   Mem.ADDR);   m.put("A",    Mem.ADDR);
+        m.put("$5", Mem.DATA);  m.put("dataOut",Mem.DATA);   m.put("Q",    Mem.DATA);
+
+        // Chip select y output enable siempre existen lógicamente
+        m. put("cs", Mem.CS);   m.put("CS", Mem.CS);
+        m.put("oe", OE);    m.put("OE", OE);
+
+        // CLK sólo si existe (no asíncrono)
+        if (CLK >= 0) { m.put("$1", CLK); m.put("clk", CLK); m.put("CLK", CLK); }
+
+        // RESET/CLEAR si existe
+        if (CLR >= 0) {
+            m.put("clr", CLR); m.put("CLR", CLR);
+            m.put("rst", CLR); m.put("RST", CLR);
+        }
+
+        // Bus de datos de entrada:
+        if (separate && DIN >= 0) {
+            m.put("$4", DIN); m.put("dataIn", DIN); m.put("D", DIN);
+        } else {
+            // En bus combinado no hay DIN separado; permite alias por compatibilidad:
+            m.put("$4", Mem.DATA); m.put("dataIn", Mem.DATA); m.put("D",  Mem.DATA);
+        }
+
+        // WE sólo si bus separado; en bus combinado el “escritura” se controla con OE
+        if (separate && WE >= 0) {
+            m.put("$2", WE); m.put("we", WE); m.put("WE", WE);
+        }
+
+        // Algunos alias adicionales por robustez
+        m.putIfAbsent("DO", Mem.DATA);
+        if (separate && DIN >= 0) m.putIfAbsent("DI", DIN);
+
         return m;
     }
 }

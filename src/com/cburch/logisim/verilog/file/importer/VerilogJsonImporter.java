@@ -1,7 +1,6 @@
 package com.cburch.logisim.verilog.file.importer;
 
 import com.cburch.logisim.circuit.Circuit;
-import com.cburch.logisim.data.*;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.std.arith.ArithmeticPortMapRegister;
 import com.cburch.logisim.std.gates.GatesPortMapRegister;
@@ -9,7 +8,6 @@ import com.cburch.logisim.std.memory.MemoryPortMapRegister;
 import com.cburch.logisim.std.plexers.PlexersPortMapRegister;
 import com.cburch.logisim.std.yosys.YosysComponentsPortMapRegister;
 import com.cburch.logisim.verilog.comp.CellFactoryRegistry;
-import com.cburch.logisim.verilog.comp.auxiliary.*;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleBuilder;
 import com.cburch.logisim.verilog.file.jsonhdlr.YosysJsonNetlist;
 import com.cburch.logisim.verilog.file.materializer.ModuleMaterializer;
@@ -22,11 +20,10 @@ import com.cburch.logisim.verilog.std.BuiltinPortMaps;
 import com.cburch.logisim.verilog.std.ComponentAdapterRegistry;
 import com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter;
 import com.cburch.logisim.verilog.std.adapters.gatelvl.GateOpAdapter;
+import com.cburch.logisim.verilog.std.adapters.ips.IPOpAdapter;
 import com.cburch.logisim.verilog.std.adapters.wordlvl.*;
 
-import java.awt.*;
 import java.nio.file.Path;
-import java.util.*;
 import java.util.List;
 
 import static com.cburch.logisim.verilog.file.ui.WarningCollector.showXWarningDialogLater;
@@ -58,6 +55,7 @@ public final class VerilogJsonImporter {
         this.registry = registry;
         this.builder = new VerilogModuleBuilder(registry);
         this.adapter = new ComponentAdapterRegistry()
+                .register(new IPOpAdapter())
                 .register(new GateOpAdapter())
                 .register(new UnaryOpAdapter())
                 .register(new BinaryOpAdapter())

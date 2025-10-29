@@ -19,6 +19,7 @@ import com.cburch.logisim.verilog.layout.auxiliary.NodeSizer;
 import com.cburch.logisim.verilog.std.BuiltinPortMaps;
 import com.cburch.logisim.verilog.std.ComponentAdapterRegistry;
 import com.cburch.logisim.verilog.std.adapters.ModuleBlackBoxAdapter;
+import com.cburch.logisim.verilog.std.adapters.gatelvl.RegisterGateOpAdapter;
 import com.cburch.logisim.verilog.std.adapters.gatelvl.GateOpAdapter;
 import com.cburch.logisim.verilog.std.adapters.ips.IPOpAdapter;
 import com.cburch.logisim.verilog.std.adapters.wordlvl.*;
@@ -57,6 +58,7 @@ public final class VerilogJsonImporter {
         this.adapter = new ComponentAdapterRegistry()
                 .register(new IPOpAdapter())
                 .register(new GateOpAdapter())
+                .register(new RegisterGateOpAdapter())
                 .register(new UnaryOpAdapter())
                 .register(new BinaryOpAdapter())
                 .register(new MuxOpAdapter())

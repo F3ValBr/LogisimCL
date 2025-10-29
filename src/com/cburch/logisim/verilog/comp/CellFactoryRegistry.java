@@ -6,6 +6,7 @@ import com.cburch.logisim.verilog.comp.factories.ips.IPModuleFactory;
 import com.cburch.logisim.verilog.comp.factories.wordlvl.*;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.specs.ModuleAttribs;
+import com.cburch.logisim.verilog.comp.specs.gatelvl.RegisterGateOp;
 import com.cburch.logisim.verilog.comp.specs.gatelvl.GateOp;
 import com.cburch.logisim.verilog.comp.specs.wordlvl.*;
 
@@ -21,6 +22,7 @@ public class CellFactoryRegistry {
     private final VerilogCellFactory registerFactory = new RegisterOpFactory();
     private final VerilogCellFactory memoryFactory = new MemoryOpFactory();
     private final VerilogCellFactory gateFactory   = new GateOpFactory();
+    private final VerilogCellFactory registerGateFactory = new RegisterGateOpFactory();
     private final VerilogCellFactory moduleFactory = new ModuleInstanceFactory();
 
     public void register(String typeId, VerilogCellFactory factory) {
@@ -51,6 +53,8 @@ public class CellFactoryRegistry {
         if (norm.startsWith("$_")) {
             if (GateOp.isGateTypeId(typeId))
                 return gateFactory.create(name, typeId, parameters, attributes, portDirections, connections);
+            if (RegisterGateOp.matchesRGOp(typeId))
+                return registerGateFactory.create(name, typeId, parameters, attributes, portDirections, connections);
             return moduleFactory.create(name, typeId, parameters, attributes, portDirections, connections);
         }
 

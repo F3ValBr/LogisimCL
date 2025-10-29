@@ -65,6 +65,7 @@ public final class MemoryPortMapRegister implements PortMapRegister {
         m.put("q",   OUT);
         m.put("d",   IN);
         m.put("clk", CK);
+        m.put("C",   CK);
 
         if (RST != null) {
             m.put("RST", RST);
@@ -72,12 +73,14 @@ public final class MemoryPortMapRegister implements PortMapRegister {
             m.put("SRST", RST);
             m.put("rst", RST); m.put("arst", RST); m.put("srst", RST);
             m.put("CLR", RST); m.put("clr",  RST);
+            m.put("R",  RST);
         }
         if (EN  != null) {
             m.put("EN", EN);
             m.put("en", EN);
             m.put("ENABLE", EN);
             m.put("enable", EN);
+            m.put("E", EN);
         }
         return m;
     }

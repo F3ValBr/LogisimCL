@@ -70,5 +70,3 @@ public enum GateOp {
         return Optional.ofNullable(INDEX.get(typeId));
     }
 }
-
-

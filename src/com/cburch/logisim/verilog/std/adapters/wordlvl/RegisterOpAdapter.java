@@ -134,18 +134,15 @@ public final class RegisterOpAdapter extends AbstractComponentAdapter
             Component comp = addComponent(proj, circ, g, lf.factory, where, attrs);
 
             // == Port map dinámico por librería+factory+instancia ==
-            // (Requiere que BuiltinPortMaps.initOnce(...) haya corrido antes)
             Map<String,Integer> nameToIdx =
                     BuiltinPortMaps.forFactory(lf.lib, lf.factory, comp);
 
-            // Si no registraste aún un resolver para Register, como mínimo intenta Q/D/CLK:
             if (nameToIdx.isEmpty()) {
                 // Orden por tu Register: OUT=0, IN=1, CK=2, (RST=?, EN=?)
                 nameToIdx = new java.util.LinkedHashMap<>();
                 nameToIdx.put("Q",   0);
                 nameToIdx.put("D",   1);
                 nameToIdx.put("CLK", 2);
-                // Deja RST/EN para cuando registres el resolver (ver helper abajo).
             }
 
             PortGeom pg = PortGeom.of(comp, nameToIdx);

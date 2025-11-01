@@ -1,11 +1,16 @@
 package com.cburch.logisim.verilog.file.importer.routing;
 
 import com.cburch.logisim.circuit.Wire;
+import com.cburch.logisim.comp.EndData;
+import com.cburch.logisim.data.AttributeSet;
 import com.cburch.logisim.data.Bounds;
 import com.cburch.logisim.data.Direction;
 import com.cburch.logisim.data.Location;
 import com.cburch.logisim.circuit.Circuit;
 import com.cburch.logisim.comp.Component;
+import com.cburch.logisim.instance.StdAttr;
+import com.cburch.logisim.std.wiring.BitLabeledTunnel;
+import com.cburch.logisim.std.wiring.Tunnel;
 import com.cburch.logisim.verilog.file.importer.BitLabeledTunnelRewriter;
 
 import java.awt.*;
@@ -91,16 +96,70 @@ public final class RouterUtils {
     }
 
     /** Reunites Bounds of all components except those in the group (to avoid collisions). */
-    public static List<Bounds> collectComponentBounds(Circuit circ, Graphics g, List<BitLabeledTunnelRewriter.TunnelInfo> ignoreGrp) {
+    public static List<Bounds> collectComponentBounds(Circuit circ,
+                                                      Graphics g,
+                                                      List<BitLabeledTunnelRewriter.TunnelInfo> ignoreGrp) {
         Set<Component> ignore = new HashSet<>();
-        if (ignoreGrp != null) for (BitLabeledTunnelRewriter.TunnelInfo ti : ignoreGrp) ignore.add(ti.comp());
+        if (ignoreGrp != null) {
+            for (BitLabeledTunnelRewriter.TunnelInfo ti : ignoreGrp) {
+                ignore.add(ti.comp());
+            }
+        }
 
         List<Bounds> obs = new ArrayList<>();
         for (Component c : circ.getNonWires()) {
             if (ignore.contains(c)) continue;
+
+            // === túneles (normales o bit-labeled) ===
+            if (c.getFactory() instanceof Tunnel
+                    || c.getFactory() instanceof BitLabeledTunnel) {
+
+                AttributeSet as = c.getAttributeSet();
+                Direction facing = Direction.EAST;
+                if (as != null) {
+                    try {
+                        Direction d = as.getValue(StdAttr.FACING);
+                        if (d != null) facing = d;
+                    } catch (Throwable ignore2) { /* default EAST */ }
+                }
+
+                Bounds b = c.getBounds(g);
+                if (b != null) {
+                    // grosor mínimo
+                    final int THICK = 6; // ajusta a gusto
+                    Bounds slim;
+
+                    if (facing == Direction.EAST || facing == Direction.WEST) {
+                        // túnel horizontal: respetar largo (width), achicar alto
+                        int cx = b.getX();
+                        int cy = b.getY() + b.getHeight() / 2 - THICK / 2;
+                        slim = Bounds.create(cx, cy, b.getWidth(), THICK);
+                    } else {
+                        // túnel vertical: respetar largo (height), achicar ancho
+                        int cx = b.getX() + b.getWidth() / 2 - THICK / 2;
+                        int cy = b.getY();
+                        slim = Bounds.create(cx, cy, THICK, b.getHeight());
+                    }
+
+                    obs.add(slim);
+                }
+
+                // blindar siempre la boquita
+                EndData end0 = c.getEnd(0);
+                if (end0 != null) {
+                    Location pin = end0.getLocation();
+                    int m = 3; // un poquito más chico que el túnel mismo
+                    Bounds pinBox = Bounds.create(pin.getX() - m, pin.getY() - m,
+                            2 * m + 1, 2 * m + 1);
+                    obs.add(pinBox);
+                }
+
+                continue;
+            }
+
+            // === resto de componentes ===
             Bounds b = c.getBounds(g);
             if (b != null && b.getWidth() > 0 && b.getHeight() > 0) {
-                // pequeño “inflate” para no besar bordes
                 obs.add(b.expand(2));
             }
         }

@@ -42,10 +42,10 @@ public class ImporterUtils {
         /** Returns the location obtained by moving 'step' units from 'base' in 'facing' direction. */
         static Location stepFrom(Location base, Direction facing, int step) {
             int dx=0,dy=0;
-            if (facing == Direction.EAST) dx = step;
-            else if (facing == Direction.WEST) dx = -step;
-            else if (facing == Direction.SOUTH) dy = step;
-            else if (facing == Direction.NORTH) dy = -step;
+            if (facing == Direction.EAST) dx = -step;
+            else if (facing == Direction.WEST) dx = step;
+            else if (facing == Direction.SOUTH) dy = -step;
+            else if (facing == Direction.NORTH) dy = step;
             return Location.create(base.getX()+dx, base.getY()+dy);
         }
 

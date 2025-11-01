@@ -149,7 +149,7 @@ final class ConstantPlacer {
             int val = packBitsToInt(bitsLSBFirst, placed, len);
 
             // Colocar el chunk sin cable, desplazado hacia atrás de la boca
-            Location where = ImporterUtils.Geom.stepFrom(mouth, facing, -(9 + 2 * chunkIdx) * grid);
+            Location where = ImporterUtils.Geom.stepFrom(mouth, facing, (9 + 2 * chunkIdx) * grid);
             createConstantDecorative(batch, proj, where, len, val, facing, ">32 bits");
             placed += len;
             chunkIdx++;
@@ -187,7 +187,7 @@ final class ConstantPlacer {
                                              int value,
                                              Direction facing) {
         try {
-            Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, -grid);
+            Location kLoc = ImporterUtils.Geom.stepFrom(mouth, facing, grid);
 
             ComponentFactory constF = Constant.FACTORY;
             AttributeSet a = constF.createAttributeSet();

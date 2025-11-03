@@ -1,13 +1,15 @@
 package com.cburch.logisim.verilog.file.importer;
 
 import com.cburch.logisim.circuit.Circuit;
-import com.cburch.logisim.data.*;
+
+import com.cburch.logisim.data.Location;
 import com.cburch.logisim.proj.Project;
 import com.cburch.logisim.verilog.comp.CellFactoryRegistry;
 import com.cburch.logisim.verilog.comp.auxiliary.*;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleBuilder;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleImpl;
+import com.cburch.logisim.verilog.file.Strings;
 import com.cburch.logisim.verilog.file.jsonhdlr.YosysJsonNetlist;
 import com.cburch.logisim.verilog.file.jsonhdlr.YosysModuleDTO;
 import com.cburch.logisim.verilog.file.ui.ImportProgress;
@@ -105,7 +107,7 @@ final class ImportPipeline {
         }
 
         // start it
-        progress.onStart("Importando " + modules.size() + " módulo(s)…");
+        progress.onStart(Strings.get("import.pipeline.start", modules.size()));
 
         // Create circuits
         for (YosysModuleDTO dto : modules) {
@@ -114,7 +116,8 @@ final class ImportPipeline {
 
         // Import modules
         for (YosysModuleDTO dto : modules) {
-            progress.onPhase("Importando módulo: " + dto.name());
+            // "Importando módulo: X"
+            progress.onPhase(Strings.get("import.pipeline.phase.module", dto.name()));
 
             if (main == null) {
                 main = byModule.get(dto.name());
@@ -122,7 +125,7 @@ final class ImportPipeline {
 
             try {
                 // 1) build representation
-                progress.onPhase("[" + dto.name() + "] Construyendo representación…");
+                progress.onPhase(Strings.get("import.pipeline.phase.build", dto.name()));
                 VerilogModuleImpl mod = builder.buildModule(dto);
                 ModuleNetIndex netIndex = builder.buildNetIndex(mod);
                 MemoryIndex memIndex = builder.buildMemoryIndex(mod);
@@ -132,7 +135,7 @@ final class ImportPipeline {
                 Map<VerilogCell, VerilogCell> alias = ImporterUtils.MemoryAlias.build(mod, memIndex);
 
                 // 2) layout
-                progress.onPhase("[" + dto.name() + "] Calculando layout ELK…");
+                progress.onPhase(Strings.get("import.pipeline.phase.layout", dto.name()));
                 LayoutBuilder.Result elk = LayoutBuilder.build(proj, mod, netIndex, sizer, alias);
                 try {
                     LayoutRunner.run(elk.root);
@@ -143,11 +146,11 @@ final class ImportPipeline {
                     Map<ModulePort, LayoutServices.PortAnchor> topAnchors = new HashMap<>();
 
                     // 3) pins
-                    progress.onPhase("[" + dto.name() + "] Añadiendo pines superiores…");
+                    progress.onPhase(Strings.get("import.pipeline.phase.pins", dto.name()));
                     layout.addModulePins(proj, target, mod, elk, g, topAnchors);
 
-                    // 4) putting cells
-                    progress.onPhase("[" + dto.name() + "] Colocando celdas…");
+                    // 4) cells
+                    progress.onPhase(Strings.get("import.pipeline.phase.cells", dto.name()));
                     for (VerilogCell cell : mod.cells()) {
                         if (alias.containsKey(cell)) continue;
                         ElkNode n = elk.cellNode.get(cell);
@@ -160,19 +163,19 @@ final class ImportPipeline {
                     }
 
                     // 5) tunnels + constants
-                    progress.onPhase("[" + dto.name() + "] Insertando túneles y constantes…");
+                    progress.onPhase(Strings.get("import.pipeline.phase.tunnels", dto.name()));
                     ImportBatch batch = new ImportBatch(target);
                     tunnels.place(batch, mod, cellHandles, topAnchors, g, specs);
                     constants.place(batch, proj, mod, cellHandles, topAnchors, g, specs);
                     batch.commit(proj, "addComponentsFromImportAction");
 
-                    // 6) tunnel rewriting
-                    progress.onPhase("[" + dto.name() + "] Reescribiendo túneles a cables…");
+                    // 6) rewrite tunnels
+                    progress.onPhase(Strings.get("import.pipeline.phase.rewrite", dto.name()));
                     try {
                         BitLabeledTunnelRewriter.rewrite(proj, target, g);
                     } catch (Throwable t) {
                         t.printStackTrace();
-                        progress.onError("No se pudo reescribir túneles para " + dto.name(), t);
+                        progress.onError(Strings.get("import.pipeline.error.rewrite", dto.name()), t);
                     }
 
                     alias.clear();
@@ -186,7 +189,7 @@ final class ImportPipeline {
                 }
             } catch (Throwable t) {
                 t.printStackTrace();
-                progress.onError("Error importando módulo " + dto.name(), t);
+                progress.onError(Strings.get("import.pipeline.error.module", dto.name()), t);
             }
         }
 
@@ -201,20 +204,20 @@ final class ImportPipeline {
      */
     void materializeSingleModule(YosysJsonNetlist netlist, String moduleName) {
         Graphics g = ImporterUtils.Geom.makeScratchGraphics();
-        progress.onStart("Materializando módulo " + moduleName + "…");
+        progress.onStart(Strings.get("import.pipeline.materialize.start", moduleName));
 
         for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) netlist.modules()::iterator) {
             if (!moduleName.equals(dto.name())) continue;
 
             try {
-                progress.onPhase("[" + moduleName + "] Construyendo representación…");
+                progress.onPhase(Strings.get("import.pipeline.phase.build", moduleName));
                 VerilogModuleImpl mod = builder.buildModule(dto);
                 ModuleNetIndex netIndex = builder.buildNetIndex(mod);
                 MemoryIndex memIndex = builder.buildMemoryIndex(mod);
                 memoryAdapter.beginModule(memIndex, mod);
                 Map<VerilogCell, VerilogCell> alias = ImporterUtils.MemoryAlias.build(mod, memIndex);
 
-                progress.onPhase("[" + moduleName + "] Calculando layout…");
+                progress.onPhase(Strings.get("import.pipeline.phase.layout", moduleName));
                 LayoutBuilder.Result elk = LayoutBuilder.build(proj, mod, netIndex, sizer, alias);
                 try {
                     LayoutRunner.run(elk.root);
@@ -231,7 +234,7 @@ final class ImportPipeline {
 
                     layout.addModulePins(proj, target, mod, elk, g, topAnchors);
 
-                    progress.onPhase("[" + moduleName + "] Colocando celdas…");
+                    progress.onPhase(Strings.get("import.pipeline.phase.cells", moduleName));
                     for (VerilogCell cell : mod.cells()) {
                         if (alias.containsKey(cell)) continue;
                         ElkNode n = elk.cellNode.get(cell);
@@ -243,18 +246,18 @@ final class ImportPipeline {
                         cellHandles.put(cell, h);
                     }
 
-                    progress.onPhase("[" + moduleName + "] Insertando túneles/constantes…");
+                    progress.onPhase(Strings.get("import.pipeline.phase.tunnels", moduleName));
                     ImportBatch batch = new ImportBatch(target);
                     tunnels.place(batch, mod, cellHandles, topAnchors, g, specs);
                     constants.place(batch, proj, mod, cellHandles, topAnchors, g, specs);
                     batch.commit(proj, "materializeModuleAction");
 
-                    progress.onPhase("[" + moduleName + "] Reescribiendo túneles…");
+                    progress.onPhase(Strings.get("import.pipeline.phase.rewrite", moduleName));
                     try {
                         BitLabeledTunnelRewriter.rewrite(proj, target, g);
                     } catch (Throwable t) {
                         t.printStackTrace();
-                        progress.onError("No se pudo reescribir túneles para " + moduleName, t);
+                        progress.onError(Strings.get("import.pipeline.error.rewrite", moduleName), t);
                     }
 
                     alias.clear();
@@ -270,7 +273,7 @@ final class ImportPipeline {
                 }
             } catch (Throwable t) {
                 t.printStackTrace();
-                progress.onError("Error materializando " + moduleName, t);
+                progress.onError(Strings.get("import.pipeline.error.materialize", moduleName), t);
                 progress.onDone();
                 return;
             }

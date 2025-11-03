@@ -9,6 +9,7 @@ import com.cburch.logisim.std.plexers.PlexersPortMapRegister;
 import com.cburch.logisim.std.yosys.YosysComponentsPortMapRegister;
 import com.cburch.logisim.verilog.comp.CellFactoryRegistry;
 import com.cburch.logisim.verilog.comp.impl.VerilogModuleBuilder;
+import com.cburch.logisim.verilog.file.Strings;
 import com.cburch.logisim.verilog.file.jsonhdlr.YosysJsonNetlist;
 import com.cburch.logisim.verilog.file.materializer.ModuleMaterializer;
 import com.cburch.logisim.verilog.file.ui.*;
@@ -104,11 +105,11 @@ public final class VerilogJsonImporter {
             @Override
             protected Circuit doInBackground() throws Exception {
                 // parse JSON netlist
-                dlg.onStart("Analizando netlist…");
+                dlg.onStart(Strings.get("import.json.analyzing"));
                 YosysJsonNetlist netlist = YosysJsonNetlist.from(rootJson);
 
                 // run import pipeline
-                dlg.onPhase("Preparando importación…");
+                dlg.onPhase(Strings.get("import.json.preparing"));
                 ImportPipeline pipeline = new ImportPipeline(
                         proj,
                         registry,
@@ -125,7 +126,7 @@ public final class VerilogJsonImporter {
                 );
 
                 // import main module and related modules
-                dlg.onPhase("Importando módulos…");
+                dlg.onPhase(Strings.get("import.json.importing.modules"));
                 Circuit main = pipeline.run(netlist);
 
                 dlg.onDone();
@@ -144,8 +145,8 @@ public final class VerilogJsonImporter {
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(
                             owner,
-                            "No se pudo importar: " + ex.getMessage(),
-                            "Error al importar",
+                            Strings.get("import.json.error", ex.getMessage()),
+                            Strings.get("import.json.error.title"),
                             JOptionPane.ERROR_MESSAGE
                     );
                     ex.printStackTrace();

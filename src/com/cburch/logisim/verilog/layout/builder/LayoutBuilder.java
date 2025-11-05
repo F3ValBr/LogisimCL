@@ -125,12 +125,12 @@ public final class LayoutBuilder {
         // --- separaciones principales ---
         // distancia entre capas (X si vas a la derecha)
         root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, 80.0);  // por si hay muchas aristas
-        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, 140.0); // distancia “mínima” entre capas
+        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, 100.0); // distancia “mínima” entre capas
         // distancia entre nodos de la misma capa (vertical, en tu caso)
-        root.setProperty(LayeredOptions.SPACING_NODE_NODE, 100.0);
+        root.setProperty(LayeredOptions.SPACING_NODE_NODE, 120.0);
 
         // margen global entre “componentes” sueltos
-        root.setProperty(CoreOptions.SPACING_COMPONENT_COMPONENT, 140.0);
+        root.setProperty(CoreOptions.SPACING_COMPONENT_COMPONENT, 100.0);
 
         // si hay puertos o labels en el medio, a veces ayuda esto:
         root.setProperty(CoreOptions.SPACING_LABEL_NODE, 20.0);

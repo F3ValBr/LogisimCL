@@ -19,6 +19,7 @@ import com.cburch.logisim.verilog.comp.specs.wordlvl.memoryparams.memwriteparams
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Factory for creating memory operation Verilog cells.
@@ -38,6 +39,10 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
         final CellType ct = CellType.fromYosys(type);
         final GenericCellAttribs attribs = new GenericCellAttribs(attributes);
 
+        // 0) Normalizaciones previas a construir endpoints
+        /* fixme: esta función corrige el detalle de que un puerto WR_EN sea multibit en el json, pero esta medio hardcodeada corregir en la medida de lo posible, hace lo que debe hacer por ahora */
+        normalizeWriteEnable(op, connections);
+
         // 1) Specific params by type
         final MemoryOpParams params = newParams(op, parameters);
 
@@ -51,6 +56,75 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
         validatePorts(cell, op, params);
 
         return cell;
+    }
+
+    /* ============================
+       Normalizaciones
+       ============================ */
+
+    /**
+     * Colapsa señales de write-enable por-bit a 1 bit cuando corresponde,
+     * preservando el tipo de los elementos (Integer para nets, "0"/"1" para constantes).
+     * - $mem / $mem_v2 usan "WR_EN" (ancho WIDTH*WR_PORTS)
+     * - $memwr / $memwr_v2 usan "EN"   (ancho WIDTH)
+     */
+    private static void normalizeWriteEnable(MemoryOp op, Map<String, List<Object>> conns) {
+        if (conns == null) return;
+
+        switch (op) {
+            case MEM, MEM_V2 -> collapseKeyToSingleBit(conns, "WR_EN");
+            case MEMWR, MEMWR_V2 -> collapseKeyToSingleBit(conns, "EN");
+            default -> { /* no-op */ }
+        }
+    }
+
+    /**
+     * Reduce una lista de bits a un único bit:
+     * - Si la lista está vacía → "0"
+     * - Si todos los elementos son exactamente iguales → ese mismo objeto
+     * - Si todos son constantes "0"/"1" → OR lógico → "1" si hay algún "1", si no "0"
+     * - Mezcla (nets + constantes, etc.) → toma el primero tal cual (degradación aceptable)
+     * Siempre deja el resultado como una lista de un solo elemento, sin cambiar tipos.
+     */
+    private static void collapseKeyToSingleBit(Map<String, List<Object>> conns, String key) {
+        if (!conns.containsKey(key)) return;
+
+        List<Object> lst = conns.get(key);
+        if (lst == null || lst.isEmpty()) {
+            conns.put(key, List.of("0"));
+            return;
+        }
+
+        // ¿todos exactamente iguales?
+        boolean allSame = true;
+        Object first = lst.get(0);
+        for (int i = 1; i < lst.size(); i++) {
+            if (!Objects.equals(first, lst.get(i))) { allSame = false; break; }
+        }
+        if (allSame) {
+            conns.put(key, List.of(first));
+            return;
+        }
+
+        // ¿todas constantes 0/1? -> OR
+        boolean allConst01 = true;
+        boolean anyOne = false;
+        for (Object o : lst) {
+            if (o instanceof String s) {
+                String t = s.trim();
+                if ("1".equals(t)) anyOne = true;
+                if (!"0".equals(t) && !"1".equals(t)) { allConst01 = false; break; }
+            } else {
+                allConst01 = false; break;
+            }
+        }
+        if (allConst01) {
+            conns.put(key, List.of(anyOne ? "1" : "0"));
+            return;
+        }
+
+        // Mezcla de nets y/o constantes no puras → tomar el primero preservando el tipo
+        conns.put(key, List.of(first));
     }
 
     /* ============================
@@ -102,9 +176,9 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
         requirePortWidthOptional(cell, "RD_DATA", p.width()  * p.rdPorts());
         requirePortWidthOptional(cell, "WR_ADDR", p.abits() * p.wrPorts());
         requirePortWidthOptional(cell, "WR_DATA", p.width()  * p.wrPorts());
-        // EN por-bit (WIDTH * WR_PORTS).
+        // Tras la normalización, si existe WR_EN debe ser de 1 bit por puerto de escritura real.
         if (hasPort(cell, "WR_EN")) {
-            requirePortWidth(cell, "WR_EN", p.width() * p.wrPorts());
+            requirePortWidth(cell, "WR_EN", 1);
         }
         // TODO: check buses organization (contiguous, same order)
     }
@@ -123,14 +197,9 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
     private void validateMemWr(VerilogCell cell, MemoryOpParams p) {
         requirePortWidth(cell, "ADDR", p.abits());
         requirePortWidth(cell, "DATA", p.width());
-        // EN each bit (WIDTH).
-        if (hasPort(cell, "EN")) requirePortWidth(cell, "EN", p.width());
+        if (hasPort(cell, "EN")) requirePortWidth(cell, "EN", 1);
         if (p.clkEnable() && hasPort(cell, "CLK")) requirePortWidth(cell, "CLK", 1);
     }
-
-    /* ============================
-       Port helpers
-       ============================ */
 
     private static void requirePortWidth(VerilogCell cell, String port, int expected) {
         int got = cell.portWidth(port);
@@ -148,4 +217,3 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
         return cell.getPortNames().contains(port);
     }
 }
-

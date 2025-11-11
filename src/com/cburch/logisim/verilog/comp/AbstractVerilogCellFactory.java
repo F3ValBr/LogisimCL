@@ -85,5 +85,4 @@ public abstract class AbstractVerilogCellFactory implements VerilogCellFactory {
             // Si no hay bits en connections para este puerto, no se crean endpoints (width = 0).
         }
     }
-
 }

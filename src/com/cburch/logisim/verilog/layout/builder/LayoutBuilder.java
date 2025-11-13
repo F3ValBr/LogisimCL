@@ -30,31 +30,25 @@ public final class LayoutBuilder {
 
     // --- Agrupadores/keys para buses -----------------------------------------
 
-    /** Identifica un “extremo lógico” por (nodo, nombre-de-puerto) para no mezclar buses distintos por el mismo par de nodos. */
-    private static final class EpKey {
-        final ElkNode node;
-        final String portName;
-        EpKey(ElkNode node, String portName) {
-            this.node = node;
-            this.portName = portName;
-        }
+    /**
+     * Identifica un “extremo lógico” por (nodo, nombre-de-puerto) para no mezclar buses distintos por el mismo par de nodos.
+     */
+    private record EpKey(ElkNode node, String portName) {
         @Override public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof EpKey k)) return false;
             return node == k.node && Objects.equals(portName, k.portName);
         }
+
         @Override public int hashCode() {
             return 31 * System.identityHashCode(node) + Objects.hashCode(portName);
         }
     }
 
-    /** Par dirigido (src,dst) + baseLabel (nombre lógico del bus para la etiqueta). */
-    private static final class PairKey {
-        final EpKey src, dst;
-        final String baseLabel;
-        PairKey(EpKey src, EpKey dst, String baseLabel) {
-            this.src = src; this.dst = dst; this.baseLabel = baseLabel;
-        }
+    /**
+     * Par dirigido (src,dst) + baseLabel (nombre lógico del bus para la etiqueta).
+     */
+    private record PairKey(EpKey src, EpKey dst, String baseLabel) {
         @Override public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof PairKey k)) return false;
@@ -62,19 +56,13 @@ public final class LayoutBuilder {
                     Objects.equals(dst, k.dst) &&
                     Objects.equals(baseLabel, k.baseLabel);
         }
+
         @Override public int hashCode() {
             return (31 * src.hashCode() + dst.hashCode()) * 31 + Objects.hashCode(baseLabel);
         }
     }
 
-    private static final class RefInfo {
-        final ElkNode node;
-        final String portName;
-        final int bitIndex;
-        RefInfo(ElkNode node, String portName, int bitIndex){
-            this.node=node; this.portName=portName; this.bitIndex=bitIndex;
-        }
-    }
+    private record RefInfo(ElkNode node, String portName, int bitIndex) { }
 
     // --- Utilidades -----------------------------------------------------------
 
@@ -123,14 +111,15 @@ public final class LayoutBuilder {
         root.setProperty(CoreOptions.ALGORITHM, "org.eclipse.elk.layered");
 
         // --- separaciones principales ---
-        // distancia entre capas (X si vas a la derecha)
-        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, 80.0);  // por si hay muchas aristas
-        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, 100.0); // distancia “mínima” entre capas
-        // distancia entre nodos de la misma capa (vertical, en tu caso)
-        root.setProperty(LayeredOptions.SPACING_NODE_NODE, 120.0);
+        // distancia entre capas
+        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, 40.0);
+        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, 60.0);
+
+        // distancia entre nodos de la misma capa (vertical)
+        root.setProperty(LayeredOptions.SPACING_NODE_NODE, 60.0);
 
         // margen global entre “componentes” sueltos
-        root.setProperty(CoreOptions.SPACING_COMPONENT_COMPONENT, 100.0);
+        root.setProperty(CoreOptions.SPACING_COMPONENT_COMPONENT, 40.0);
 
         // si hay puertos o labels en el medio, a veces ayuda esto:
         root.setProperty(CoreOptions.SPACING_LABEL_NODE, 20.0);
@@ -142,7 +131,7 @@ public final class LayoutBuilder {
         root.setProperty(LayeredOptions.EDGE_LABELS_PLACEMENT, EdgeLabelPlacement.CENTER);
 
         // padding del diagrama entero
-        root.setProperty(CoreOptions.PADDING, new ElkPadding(40, 40, 40, 40));
+        root.setProperty(CoreOptions.PADDING, new ElkPadding(20, 20, 20, 20));
 
         Result r = new Result(root);
 

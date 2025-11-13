@@ -2,6 +2,7 @@ package com.cburch.logisim.verilog.file.importer.routing;
 
 import com.cburch.logisim.data.Bounds;
 import com.cburch.logisim.data.Location;
+import com.cburch.logisim.verilog.file.importer.ImporterUtils;
 
 import java.awt.*;
 import java.util.*;
@@ -114,8 +115,8 @@ public final class GridRouter {
     }
 
     private Location snap(Location p) {
-        int x = ((p.getX() + grid/2) / grid) * grid;
-        int y = ((p.getY() + grid/2) / grid) * grid;
+        int x = ImporterUtils.Geom.snap(p.getX() + grid/2);
+        int y = ImporterUtils.Geom.snap(p.getY() + grid/2);
         return Location.create(x, y);
     }
 

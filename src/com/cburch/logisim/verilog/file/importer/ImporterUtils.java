@@ -211,8 +211,8 @@ public class ImporterUtils {
                     return c;
                 }
                 case CANCEL -> {
-                    // Devolvemos el existente para no romper flujos
-                    return existing;
+                    // Devolvemos null para no reemplazar circuito
+                    return null;
                 }
                 default -> {
                     // Fallback defensivo

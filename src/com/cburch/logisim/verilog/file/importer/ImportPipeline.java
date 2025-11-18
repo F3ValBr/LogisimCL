@@ -111,7 +111,12 @@ final class ImportPipeline {
 
         // Create circuits
         for (YosysModuleDTO dto : modules) {
-            byModule.put(dto.name(), ImporterUtils.Components.ensureCircuit(proj, dto.name()));
+            Circuit target = ImporterUtils.Components.ensureCircuit(proj, dto.name());
+            if (target == null) {
+                progress.onDone();
+                return null;
+            }
+            byModule.put(dto.name(), target);
         }
 
         // Import modules

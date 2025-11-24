@@ -5,10 +5,7 @@ import com.cburch.logisim.verilog.comp.auxiliary.PortSignature;
 import com.cburch.logisim.verilog.comp.auxiliary.netconn.*;
 import com.cburch.logisim.verilog.comp.impl.VerilogCell;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public abstract class AbstractVerilogCellFactory implements VerilogCellFactory {
 
@@ -22,8 +19,8 @@ public abstract class AbstractVerilogCellFactory implements VerilogCellFactory {
         return switch (d.toLowerCase()) {
             case "input" -> PortDirection.INPUT;
             case "output" -> PortDirection.OUTPUT;
-            case "inout" -> PortDirection.INOUT;
-            default -> PortDirection.UNKNOWN;
+            case "inout"  -> PortDirection.INOUT;
+            default       -> PortDirection.UNKNOWN;
         };
     }
 
@@ -39,7 +36,7 @@ public abstract class AbstractVerilogCellFactory implements VerilogCellFactory {
                 case "1" -> Const1.getInstance();
                 case "x" -> ConstX.getInstance();
                 case "z" -> ConstZ.getInstance();
-                default -> throw new IllegalArgumentException("Bit desconocido: " + raw);
+                default  -> throw new IllegalArgumentException("Bit desconocido: " + raw);
             };
         }
         throw new IllegalArgumentException("Bit no soportado: " + raw);
@@ -82,7 +79,69 @@ public abstract class AbstractVerilogCellFactory implements VerilogCellFactory {
                 );
                 cell.addPortEndpoint(ep);
             }
-            // Si no hay bits en connections para este puerto, no se crean endpoints (width = 0).
+        }
+    }
+
+    /* ==== VALIDATIONS: widths y presencia ==== */
+
+    /** Checker for port expected widths */
+    protected static void requirePortWidth(VerilogCell cell, String port, int expected) {
+        int got = cell.portWidth(port);
+        if (got != expected) {
+            throw new IllegalStateException(cell.name() + ": port " + port +
+                    " width mismatch. expected=" + expected + " got=" + got);
+        }
+    }
+
+    /** Igual que requirePortWidth, pero solo si el puerto existe. */
+    protected static void requirePortWidthOptional(VerilogCell cell, String port, int expected) {
+        if (hasPort(cell, port)) {
+            requirePortWidth(cell, port, expected);
+        }
+    }
+
+    protected static boolean hasPort(VerilogCell cell, String port) {
+        return cell.getPortNames().contains(port);
+    }
+
+    /** Exige que existan todos los puertos listados. */
+    protected static void requirePorts(VerilogCell cell, String... ports) {
+        for (String p : ports) {
+            if (!hasPort(cell, p)) {
+                throw new IllegalStateException(cell.name() + ": missing required port '" + p + "'");
+            }
+        }
+    }
+
+    /**
+     * Exige que exista al menos UN puerto de la lista.
+     * Devuelve el nombre del puerto encontrado.
+     */
+    protected static String requireAnyPort(VerilogCell cell, String... alternatives) {
+        for (String p : alternatives) {
+            if (hasPort(cell, p)) {
+                return p;
+            }
+        }
+        throw new IllegalStateException(
+                cell.name() + ": missing required port among alternatives " +
+                        Arrays.toString(alternatives)
+        );
+    }
+
+    /**
+     * Exige que existan ciertos parámetros en el mapa de parámetros.
+     * cellLabel es solo para mejorar el mensaje (puede ser type o name).
+     */
+    protected static void requireParams(String cellLabel,
+                                        Map<String, String> params,
+                                        String... keys) {
+        for (String k : keys) {
+            if (params == null || !params.containsKey(k)) {
+                throw new IllegalStateException(
+                        cellLabel + ": missing required parameter '" + k + "'"
+                );
+            }
         }
     }
 }

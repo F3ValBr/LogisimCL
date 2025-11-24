@@ -27,6 +27,9 @@ public class RegisterOpFactory extends AbstractVerilogCellFactory implements Ver
 
         RegisterOp op = RegisterOp.fromYosys(type);
 
+        // (Opcional) validación de parámetros según el op
+        validateRequiredParams(op, type, parameters);
+
         RegisterOpParams params = getRegisterOpParams(op, parameters);
 
         var attribs = new RegisterAttribs(attributes);
@@ -34,31 +37,8 @@ public class RegisterOpFactory extends AbstractVerilogCellFactory implements Ver
 
         buildEndpoints(cell, portDirections, connections);
 
-        // -------- Common validations --------
-        int w = params.width();
-        switch (op) {
-            case SDFF, SDFFE, SDFFCE -> {
-                requirePortWidth(cell, "CLK",  1);
-                requirePortWidth(cell, "SRST", 1);
-                requirePortWidth(cell, "D",    w);
-                requirePortWidth(cell, "Q",    w);
-            }
-        }
-
-        // -------- Specific validations --------
-        if (op == RegisterOp.SDFFE) {
-            // EN must exists and be 1 bit.
-            // In some dumps it appears as CE instead of EN.
-            if (hasPort(cell, "EN"))      requirePortWidth(cell, "EN", 1);
-            else if (hasPort(cell, "CE")) requirePortWidth(cell, "CE", 1);
-            else throw new IllegalStateException(cell.name()+": SDFFE requires port EN (or CE) of 1 bit");
-        }
-
-        if (op == RegisterOp.SDFFCE) {
-            if (hasPort(cell, "CE"))      requirePortWidth(cell, "CE", 1);
-            else if (hasPort(cell, "EN")) requirePortWidth(cell, "EN", 1);
-            else throw new IllegalStateException(cell.name()+": SDFFCE requires port CE (or EN) of 1 bit");
-        }
+        // Validaciones de puertos
+        validatePorts(cell, op, params);
 
         return cell;
     }
@@ -84,15 +64,45 @@ public class RegisterOpFactory extends AbstractVerilogCellFactory implements Ver
         };
     }
 
-    private static void requirePortWidth(VerilogCell cell, String port, int expected) {
-        int got = cell.portWidth(port);
-        if (got != expected) {
-            throw new IllegalStateException(cell.name() + ": port " + port +
-                    " width mismatch. expected=" + expected + " got=" + got);
+    /* ==== VALIDACIONES ESPECÍFICAS ==== */
+
+    private static void validateRequiredParams(RegisterOp op, String type,
+                                               Map<String,String> params) {
+        switch (op) {
+            case DFF, ADFF, ALDFF, DFFSR, SDFF,
+                 DFFE, ADFFE, ALDFFE, DFFSRE, SDFFE, SDFFCE ->
+                    requireParams(type, params, "WIDTH");
+            default -> { /* generic: no checks */ }
         }
     }
 
-    private static boolean hasPort(VerilogCell cell, String port) {
-        return cell.getPortNames().contains(port);
+    private void validatePorts(VerilogCell cell, RegisterOp op, RegisterOpParams params) {
+        int w = params.width();
+
+        // -------- Validaciones comunes --------
+        switch (op) {
+            case SDFF, SDFFE, SDFFCE -> {
+                requirePorts(cell, "CLK", "SRST", "D", "Q");
+                requirePortWidth(cell, "CLK",  1);
+                requirePortWidth(cell, "SRST", 1);
+                requirePortWidth(cell, "D",    w);
+                requirePortWidth(cell, "Q",    w);
+            }
+
+            // TODO: agregar aquí bloques extra para DFF / ADFF / etc.
+            default -> { /* otros tipos pueden tener sus propias reglas */ }
+        }
+
+        // -------- Validaciones específicas de enable --------
+        if (op == RegisterOp.SDFFE) {
+            // EN o CE debe existir y ser de 1 bit
+            String enPort = requireAnyPort(cell, "EN", "CE");
+            requirePortWidth(cell, enPort, 1);
+        }
+
+        if (op == RegisterOp.SDFFCE) {
+            String cePort = requireAnyPort(cell, "CE", "EN");
+            requirePortWidth(cell, cePort, 1);
+        }
     }
 }

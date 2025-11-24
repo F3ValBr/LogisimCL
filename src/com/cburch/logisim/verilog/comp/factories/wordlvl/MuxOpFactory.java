@@ -31,21 +31,62 @@ public class MuxOpFactory extends AbstractVerilogCellFactory implements VerilogC
         // 1) Classification by enum
         final MuxOp op = MuxOp.fromYosys(type);
 
-        // 2) Specific parameters by op
+        // 2) (Opcional) validación de parámetros requeridos por op
+        validateRequiredParams(op, type, params);
+
+        // 3) Specific parameters by op
         final MuxOpParams parameters = getMuxOpParams(op, params);
 
-        // 3) Attribs + cell creation
-        final CommonOpAttribs attributes = new CommonOpAttribs(attribs); // or GenericCellAttribs
-        final WordLvlCellImpl cell = new WordLvlCellImpl(name, CellType.fromYosys(type), parameters, attributes);
+        // 4) Attribs + cell creation
+        final CommonOpAttribs attributes = new CommonOpAttribs(attribs);
+        final WordLvlCellImpl cell = new WordLvlCellImpl(
+                name,
+                CellType.fromYosys(type),
+                parameters,
+                attributes
+        );
 
-        // 4) Endpoints
+        // 5) Endpoints
         buildEndpoints(cell, ports, connections);
 
-        // 5) Validations of ports by op
+        // 6) Validaciones de puertos por op
+        validatePorts(cell, op, parameters);
+
+        return cell;
+    }
+
+    private static MuxOpParams getMuxOpParams(MuxOp op, Map<String, String> params) {
+        return switch (op) {
+            case MUX   -> new MuxParams(params);
+            case PMUX  -> new PMuxParams(params);
+            case TRIBUF-> new TribufParams(params);
+            case BMUX  -> new BMuxParams(params);
+            case BWMUX -> new BWMuxParams(params);
+            case DEMUX -> new DemuxParams(params);
+        };
+    }
+
+    /* ==== VALIDACIONES ESPECÍFICAS ==== */
+
+    /** Parámetros obligatorios según el tipo de mux (ejemplo, adapta a tu realidad). */
+    private static void validateRequiredParams(MuxOp op, String type, Map<String, String> params) {
+        // Ojo: solo si de verdad necesitas chequear explícitamente
+        switch (op) {
+            case MUX, TRIBUF, BMUX, BWMUX, DEMUX ->
+                    requireParams(type, params, "WIDTH");
+            case PMUX ->
+                    requireParams(type, params, "WIDTH", "S_WIDTH"); // ejemplo
+        }
+    }
+
+    private void validatePorts(VerilogCell cell, MuxOp op, MuxOpParams parameters) {
         final int w = parameters.width();
+
         switch (op) {
             case MUX -> {
-                // A,B,Y: w bits ; S: 1 bit
+                // Puertos básicos
+                requirePorts(cell, "A", "B", "Y", "S");
+                // Anchos
                 requirePortWidth(cell, "A", w);
                 requirePortWidth(cell, "B", w);
                 requirePortWidth(cell, "Y", w);
@@ -53,52 +94,34 @@ public class MuxOpFactory extends AbstractVerilogCellFactory implements VerilogC
             }
             case PMUX -> {
                 PMuxParams p = (PMuxParams) parameters;
+                requirePorts(cell, "A", "B", "Y", "S");
                 requirePortWidth(cell, "A", w);
                 requirePortWidth(cell, "Y", w);
                 requirePortWidth(cell, "S", p.sWidth());
                 requirePortWidth(cell, "B", p.bTotalWidth());
             }
             case TRIBUF -> {
+                requirePorts(cell, "A", "Y", "EN");
                 requirePortWidth(cell, "A", w);
                 requirePortWidth(cell, "Y", w);
                 requirePortWidth(cell, "EN", 1);
             }
             case BMUX -> {
-                // Default: A, Y: w;
+                requirePorts(cell, "A", "Y");
                 requirePortWidth(cell, "A", w);
                 requirePortWidth(cell, "Y", w);
                 // TODO: validar S según BMuxParams
             }
             case BWMUX -> {
-                // TODO: validar puertos según BWMuxParams
+                // TODO: validar puertos y anchos según BWMuxParams
             }
             case DEMUX -> {
-                // DEMUX: A (w), Y (w * nSel), S (nSel)
                 DemuxParams p = (DemuxParams) parameters;
+                requirePorts(cell, "A", "Y", "S");
                 requirePortWidth(cell, "A", w);
                 requirePortWidth(cell, "S", p.sWidth());
+                // requirePortWidth(cell, "Y", w * (1 << p.sWidth()));
             }
-        }
-
-        return cell;
-    }
-
-    private static MuxOpParams getMuxOpParams(MuxOp op, Map<String, String> params) {
-        return switch (op) {
-            case MUX -> new MuxParams(params);
-            case PMUX -> new PMuxParams(params);
-            case TRIBUF -> new TribufParams(params);
-            case BMUX -> new BMuxParams(params);
-            case BWMUX -> new BWMuxParams(params);
-            case DEMUX -> new DemuxParams(params);
-        };
-    }
-
-    private void requirePortWidth(VerilogCell cell, String port, int expected) {
-        int got = cell.portWidth(port);
-        if (got != expected) {
-            throw new IllegalStateException(cell.name() + ": port " + port +
-                    " width mismatch. expected=" + expected + " got=" + got);
         }
     }
 }

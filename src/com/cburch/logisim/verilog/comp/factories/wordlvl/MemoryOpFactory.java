@@ -43,6 +43,8 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
         /* fixme: esta función corrige el detalle de que un puerto WR_EN sea multibit en el json, pero esta medio hardcodeada corregir en la medida de lo posible, hace lo que debe hacer por ahora */
         normalizeWriteEnable(op, connections);
 
+        validateRequiredParams(op, type, parameters);
+
         // 1) Specific params by type
         final MemoryOpParams params = newParams(op, parameters);
 
@@ -160,6 +162,15 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
        Validations by type
        ============================ */
 
+    private void validateRequiredParams(MemoryOp op, String type, Map<String,String> params) {
+        switch (op) {
+            case MEM, MEM_V2, MEMRD, MEMRD_V2, MEMWR, MEMWR_V2 ->
+                    requireParams(type, params, "WIDTH", "ABITS");
+            case MEMINIT, MEMINIT_V2 ->
+                    requireParams(type, params, "WIDTH");
+        }
+    }
+
     private void validatePorts(VerilogCell cell, MemoryOp op, MemoryOpParams p) {
         switch (op) {
             case MEM, MEM_V2 -> validateMemArray(cell, p);
@@ -199,21 +210,5 @@ public class MemoryOpFactory extends AbstractVerilogCellFactory implements Veril
         requirePortWidth(cell, "DATA", p.width());
         if (hasPort(cell, "EN")) requirePortWidth(cell, "EN", 1);
         if (p.clkEnable() && hasPort(cell, "CLK")) requirePortWidth(cell, "CLK", 1);
-    }
-
-    private static void requirePortWidth(VerilogCell cell, String port, int expected) {
-        int got = cell.portWidth(port);
-        if (got != expected) {
-            throw new IllegalStateException(cell.name() + ": port " + port +
-                    " width mismatch. expected=" + expected + " got=" + got);
-        }
-    }
-
-    private static void requirePortWidthOptional(VerilogCell cell, String port, int expected) {
-        if (hasPort(cell, port)) requirePortWidth(cell, port, expected);
-    }
-
-    private static boolean hasPort(VerilogCell cell, String port) {
-        return cell.getPortNames().contains(port);
     }
 }

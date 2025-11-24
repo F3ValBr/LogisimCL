@@ -33,15 +33,14 @@ public class RegisterGateOpFactory extends AbstractVerilogCellFactory implements
         CellAttribs attributes = new GenericCellAttribs(attribs);
 
         // 3) Instancia “genérica” de FF
-        //    IMPORTANTE: usa tu CellType/impl real; si no tienes uno, crea un CellType.FF_GENERIC
         GateLvlCellImpl cell = new GateLvlCellImpl(
                 name,
-                CellType.fromYosys(type), // o CellType.FF_GENERIC
+                CellType.fromYosys(type),
                 parameters,
                 attributes
         );
 
-        // 4) Endpoints: deja que el JSON mande (D,Q,C,E,R,S…)
+        // 4) Endpoints
         buildEndpoints(cell, ports, connections);
 
         return cell;

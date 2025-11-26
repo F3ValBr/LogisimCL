@@ -96,110 +96,47 @@ final class ImportPipeline {
     Circuit run(YosysJsonNetlist netlist) {
         Graphics g = ImporterUtils.Geom.makeScratchGraphics();
 
-        // Prepare module circuits
         Circuit main = null;
         Map<String, Circuit> byModule = new HashMap<>();
 
-        // recollect modules first
+        // 1) Recolectar módulos
         java.util.List<YosysModuleDTO> modules = new java.util.ArrayList<>();
         for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) netlist.modules()::iterator) {
             modules.add(dto);
         }
 
-        // start it
         progress.onStart(Strings.get("import.pipeline.start", modules.size()));
 
-        // Create circuits
+        // 2) Crear circuits (o resolver conflictos de nombre)
         for (YosysModuleDTO dto : modules) {
             Circuit target = ImporterUtils.Components.ensureCircuit(proj, dto.name());
             if (target == null) {
                 progress.onDone();
+                g.dispose();
                 return null;
             }
             byModule.put(dto.name(), target);
         }
 
-        // Import modules
+        // 3) Importar cada módulo
         for (YosysModuleDTO dto : modules) {
-            // "Importando módulo: X"
             progress.onPhase(Strings.get("import.pipeline.phase.module", dto.name()));
 
             if (main == null) {
                 main = byModule.get(dto.name());
             }
 
+            Circuit target = byModule.get(dto.name());
             try {
-                // 1) build representation
-                progress.onPhase(Strings.get("import.pipeline.phase.build", dto.name()));
-                VerilogModuleImpl mod = builder.buildModule(dto);
-                ModuleNetIndex netIndex = builder.buildNetIndex(mod);
-                MemoryIndex memIndex = builder.buildMemoryIndex(mod);
-                memoryAdapter.beginModule(memIndex, mod);
-
-                // memory alias map
-                Map<VerilogCell, VerilogCell> alias = ImporterUtils.MemoryAlias.build(mod, memIndex);
-
-                // 2) layout
-                progress.onPhase(Strings.get("import.pipeline.phase.layout", dto.name()));
-                LayoutBuilder.Result elk = LayoutBuilder.build(proj, mod, netIndex, sizer, alias);
-                try {
-                    LayoutRunner.run(elk.root);
-                    LayoutUtils.applyLayoutAndClamp(elk.root, layout.minX(), layout.minY());
-
-                    Circuit target = byModule.get(dto.name());
-                    Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
-                    Map<ModulePort, LayoutServices.PortAnchor> topAnchors = new HashMap<>();
-
-                    // 3) pins
-                    progress.onPhase(Strings.get("import.pipeline.phase.pins", dto.name()));
-                    layout.addModulePins(proj, target, mod, elk, g, topAnchors);
-
-                    // 4) cells
-                    progress.onPhase(Strings.get("import.pipeline.phase.cells", dto.name()));
-                    for (VerilogCell cell : mod.cells()) {
-                        if (alias.containsKey(cell)) continue;
-                        ElkNode n = elk.cellNode.get(cell);
-                        int x = (n == null) ? layout.minX() : ImporterUtils.Geom.snap((int) Math.round(n.getX()));
-                        int y = (n == null) ? layout.minY() : ImporterUtils.Geom.snap((int) Math.round(n.getY()));
-                        InstanceHandle h = adapter.create(proj, target, g, cell,
-                                Location.create(x + layout.separationInputCells(), y + 10)
-                        );
-                        cellHandles.put(cell, h);
-                    }
-
-                    // 5) tunnels + constants
-                    progress.onPhase(Strings.get("import.pipeline.phase.tunnels", dto.name()));
-                    ImportBatch batch = new ImportBatch(target);
-                    tunnels.place(batch, mod, cellHandles, topAnchors, g, specs);
-                    constants.place(batch, proj, mod, cellHandles, topAnchors, g, specs);
-                    batch.commit(proj, "addComponentsFromImportAction");
-
-                    // 6) rewrite tunnels
-                    progress.onPhase(Strings.get("import.pipeline.phase.rewrite", dto.name()));
-                    try {
-                        BitLabeledTunnelRewriter.rewrite(proj, target, g);
-                    } catch (Throwable t) {
-                        progress.onError(Strings.get("import.pipeline.error.rewrite", dto.name()), t);
-                    }
-
-                    alias.clear();
-                    cellHandles.clear();
-                    topAnchors.clear();
-                } finally {
-                    try { org.eclipse.emf.ecore.util.EcoreUtil.delete(elk.root, true); } catch (Exception ignored) {}
-                    elk.cellNode.clear();
-                    elk.portNode.clear();
-                    elk.root = null;
-                }
+                importModuleIntoCircuit(dto, target, g,
+                        /*actionKey*/ "addComponentsFromImportAction");
             } catch (Throwable t) {
                 String msg = Strings.get("import.pipeline.error.module", dto.name());
                 progress.onError(msg, t);
 
-                if (t instanceof RuntimeException re) {
-                    throw re;
-                } else {
-                    throw new RuntimeException(t);
-                }
+                g.dispose();
+                if (t instanceof RuntimeException re) throw re;
+                throw new RuntimeException(t);
             }
         }
 
@@ -216,78 +153,116 @@ final class ImportPipeline {
         Graphics g = ImporterUtils.Geom.makeScratchGraphics();
         progress.onStart(Strings.get("import.pipeline.materialize.start", moduleName));
 
-        for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) netlist.modules()::iterator) {
-            if (!moduleName.equals(dto.name())) continue;
+        try {
+            for (YosysModuleDTO dto : (Iterable<YosysModuleDTO>) netlist.modules()::iterator) {
+                if (!moduleName.equals(dto.name())) continue;
 
-            try {
-                progress.onPhase(Strings.get("import.pipeline.phase.build", moduleName));
-                VerilogModuleImpl mod = builder.buildModule(dto);
-                ModuleNetIndex netIndex = builder.buildNetIndex(mod);
-                MemoryIndex memIndex = builder.buildMemoryIndex(mod);
-                memoryAdapter.beginModule(memIndex, mod);
-                Map<VerilogCell, VerilogCell> alias = ImporterUtils.MemoryAlias.build(mod, memIndex);
-
-                progress.onPhase(Strings.get("import.pipeline.phase.layout", moduleName));
-                LayoutBuilder.Result elk = LayoutBuilder.build(proj, mod, netIndex, sizer, alias);
                 try {
-                    LayoutRunner.run(elk.root);
-                    LayoutUtils.applyLayoutAndClamp(elk.root, layout.minX(), layout.minY());
-
+                    // build, layout, etc.
                     Circuit target = ImporterUtils.Components.ensureCircuit(proj, moduleName);
-                    if (circuitHasAnyComponent(target)) {
+                    if (target == null) {
                         progress.onDone();
+                        g.dispose();
                         return;
                     }
 
-                    Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
-                    Map<ModulePort, LayoutServices.PortAnchor> topAnchors = new HashMap<>();
-
-                    layout.addModulePins(proj, target, mod, elk, g, topAnchors);
-
-                    progress.onPhase(Strings.get("import.pipeline.phase.cells", moduleName));
-                    for (VerilogCell cell : mod.cells()) {
-                        if (alias.containsKey(cell)) continue;
-                        ElkNode n = elk.cellNode.get(cell);
-                        int x = (n == null) ? layout.minX() : ImporterUtils.Geom.snap((int) Math.round(n.getX()));
-                        int y = (n == null) ? layout.minY() : ImporterUtils.Geom.snap((int) Math.round(n.getY()));
-                        InstanceHandle h = adapter.create( proj, target, g, cell,
-                                Location.create(x + layout.separationInputCells(), y)
-                        );
-                        cellHandles.put(cell, h);
+                    // Si ya tiene cosas, no lo pisamos
+                    if (circuitHasAnyComponent(target)) {
+                        progress.onDone();
+                        g.dispose();
+                        return;
                     }
 
-                    progress.onPhase(Strings.get("import.pipeline.phase.tunnels", moduleName));
-                    ImportBatch batch = new ImportBatch(target);
-                    tunnels.place(batch, mod, cellHandles, topAnchors, g, specs);
-                    constants.place(batch, proj, mod, cellHandles, topAnchors, g, specs);
-                    batch.commit(proj, "materializeModuleAction");
+                    importModuleIntoCircuit(dto, target, g,
+                            /*actionKey*/ "materializeModuleAction");
 
-                    progress.onPhase(Strings.get("import.pipeline.phase.rewrite", moduleName));
-                    try {
-                        BitLabeledTunnelRewriter.rewrite(proj, target, g);
-                    } catch (Throwable t) {
-                        progress.onError(Strings.get("import.pipeline.error.rewrite", moduleName), t);
-                    }
-
-                    alias.clear();
-                    cellHandles.clear();
-                    topAnchors.clear();
                     progress.onDone();
-                    return;
-                } finally {
                     g.dispose();
-                    try { org.eclipse.emf.ecore.util.EcoreUtil.delete(elk.root, true); } catch (Exception ignored) {}
-                    elk.cellNode.clear();
-                    elk.root = null;
+                    return;
+                } catch (Throwable t) {
+                    String msg = Strings.get("import.pipeline.error.materialize", moduleName);
+                    progress.onError(msg, t);
+                    progress.onDone();
+                    g.dispose();
+                    return;
                 }
-            } catch (Throwable t) {
-                String msg = Strings.get("import.pipeline.error.materialize", moduleName);
-                progress.onError(msg, t);
-                progress.onDone();
-                return;
             }
-        }
 
-        progress.onDone();
+            // No se encontró módulo con ese nombre
+            progress.onDone();
+        } finally {
+            try { g.dispose(); } catch (Throwable ignore) {}
+        }
+    }
+
+    /** Lógica común para importar UN módulo en UN circuito. */
+    private void importModuleIntoCircuit(YosysModuleDTO dto,
+                                         Circuit target,
+                                         Graphics g,
+                                         String batchActionKey) {
+        final String modName = dto.name();
+
+        // 1) build representation
+        progress.onPhase(Strings.get("import.pipeline.phase.build", modName));
+        VerilogModuleImpl mod = builder.buildModule(dto);
+        ModuleNetIndex netIndex = builder.buildNetIndex(mod);
+        MemoryIndex memIndex = builder.buildMemoryIndex(mod);
+        memoryAdapter.beginModule(memIndex, mod);
+
+        Map<VerilogCell, VerilogCell> alias = ImporterUtils.MemoryAlias.build(mod, memIndex);
+
+        // 2) layout (ELK)
+        progress.onPhase(Strings.get("import.pipeline.phase.layout", modName));
+        LayoutBuilder.Result elk = LayoutBuilder.build(proj, mod, netIndex, sizer, alias);
+        try {
+            LayoutRunner.run(elk.root);
+            LayoutUtils.applyLayoutAndClamp(elk.root, layout.minX(), layout.minY());
+
+            Map<VerilogCell, InstanceHandle> cellHandles = new HashMap<>();
+            Map<ModulePort, LayoutServices.PortAnchor> topAnchors = new HashMap<>();
+
+            ImportBatch batch = new ImportBatch(target);
+
+            // 3) pins
+            progress.onPhase(Strings.get("import.pipeline.phase.pins", modName));
+            layout.addModulePins(proj, target, mod, elk, g, topAnchors, batch);
+
+            // 4) cells
+            progress.onPhase(Strings.get("import.pipeline.phase.cells", modName));
+            for (VerilogCell cell : mod.cells()) {
+                if (alias.containsKey(cell)) continue;
+                ElkNode n = elk.cellNode.get(cell);
+                int x = (n == null) ? layout.minX() : ImporterUtils.Geom.snap((int) Math.round(n.getX()));
+                int y = (n == null) ? layout.minY() : ImporterUtils.Geom.snap((int) Math.round(n.getY()));
+                InstanceHandle h = adapter.create(
+                        proj, target, g, cell,
+                        Location.create(x + layout.separationInputCells(), y + 10)
+                );
+                cellHandles.put(cell, h);
+            }
+
+            // 5) tunnels + constants (agrupados en un batch)
+            progress.onPhase(Strings.get("import.pipeline.phase.tunnels", modName));
+            tunnels.place(batch, mod, cellHandles, topAnchors, g, specs);
+            constants.place(batch, proj, mod, cellHandles, topAnchors, g, specs);
+            batch.commit(proj, batchActionKey);
+
+            // 6) rewrite tunnels (BLT → wires / túneles plain)
+            progress.onPhase(Strings.get("import.pipeline.phase.rewrite", modName));
+            try {
+                BitLabeledTunnelRewriter.rewrite(proj, target, g);
+            } catch (Throwable t) {
+                progress.onError(Strings.get("import.pipeline.error.rewrite", modName), t);
+            }
+
+            alias.clear();
+            cellHandles.clear();
+            topAnchors.clear();
+        } finally {
+            try { org.eclipse.emf.ecore.util.EcoreUtil.delete(elk.root, true); } catch (Exception ignored) {}
+            elk.cellNode.clear();
+            elk.portNode.clear();
+            elk.root = null;
+        }
     }
 }

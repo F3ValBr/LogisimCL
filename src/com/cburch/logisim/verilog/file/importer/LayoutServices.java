@@ -34,7 +34,8 @@ final class LayoutServices {
                        VerilogModuleImpl mod,
                        LayoutBuilder.Result elk,
                        Graphics g,
-                       Map<ModulePort, PortAnchor> topAnchors) {
+                       Map<ModulePort, PortAnchor> topAnchors,
+                       ImportBatch batch) {
 
         Bounds bb = ImporterUtils.Geom.cellsBounds(elk);
         int left = bb.getX(), right = bb.getX() + bb.getWidth();
@@ -63,7 +64,7 @@ final class LayoutServices {
             Location loc = Location.create(ImporterUtils.Geom.snap(xInputs), ImporterUtils.Geom.snap(curInY));
             curInY += inStep;
 
-            Component c = ImporterUtils.Components.addComponentSafe(proj, circuit, g, Pin.FACTORY, loc, a);
+            Component c = ImporterUtils.Components.addComponentSafe(proj, circuit, g, Pin.FACTORY, loc, a, batch);
             topAnchors.put(p, new PortAnchor(c.getLocation(), Direction.EAST));
         }
 
@@ -82,7 +83,7 @@ final class LayoutServices {
             Location loc = Location.create(ImporterUtils.Geom.snap(xOutputs), ImporterUtils.Geom.snap(curOutY));
             curOutY += outStep;
 
-            Component c = ImporterUtils.Components.addComponentSafe(proj, circuit, g, Pin.FACTORY, loc, a);
+            Component c = ImporterUtils.Components.addComponentSafe(proj, circuit, g, Pin.FACTORY, loc, a, batch);
             topAnchors.put(p, new PortAnchor(c.getLocation(), Direction.WEST));
         }
     }

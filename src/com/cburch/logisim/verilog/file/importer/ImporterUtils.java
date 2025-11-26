@@ -2,7 +2,6 @@ package com.cburch.logisim.verilog.file.importer;
 
 import com.cburch.logisim.circuit.Circuit;
 import com.cburch.logisim.circuit.CircuitException;
-import com.cburch.logisim.circuit.CircuitMutation;
 import com.cburch.logisim.comp.Component;
 import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.data.*;
@@ -163,7 +162,8 @@ public class ImporterUtils {
                                           Graphics g,
                                           ComponentFactory factory,
                                           Location where,
-                                          AttributeSet attrs) throws CircuitException {
+                                          AttributeSet attrs,
+                                          ImportBatch batch) throws CircuitException {
             Component comp = factory.createComponent(where, attrs);
             if (circ.hasConflict(comp)) throw new CircuitException(Strings.get("exclusiveError"));
 
@@ -178,9 +178,7 @@ public class ImporterUtils {
             }
             if (b.getX()<0 || b.getY()<0) throw new CircuitException(Strings.get("negativeCoordError"));
 
-            CircuitMutation m = new CircuitMutation(circ);
-            m.add(comp);
-            proj.doAction(m.toAction(Strings.getter("addComponentAction", factory.getDisplayGetter())));
+            batch.add(comp);
             return comp;
         }
 

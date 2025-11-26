@@ -12,24 +12,55 @@ import java.util.List;
 
 // Acumulador simple para un módulo
 public final class ImportBatch {
-    final Circuit circuit;
-    private final List<Object> pending = new ArrayList<>();
+    private final Circuit circuit;
+    private final List<Object> toAdd = new ArrayList<>();
+    private final List<Object> toRemove = new ArrayList<>();
 
     public ImportBatch(Circuit circuit) {
         this.circuit = circuit;
     }
 
-    public void add(Component c) { pending.add(c); }
-    public void add(Wire w)      { pending.add(w); }
+    // --- helpers de uso cómodo ---
+    public void addComponent(Component c) {
+        if (c != null) toAdd.add(c);
+    }
+
+    public void addWire(Wire w) {
+        if (w != null) toAdd.add(w);
+    }
+
+    public void removeComponent(Component c) {
+        if (c != null) toRemove.add(c);
+    }
+
+    public void removeWire(Wire w) {
+        if (w != null) toRemove.add(w);
+    }
+
+    // Versión genérica por compatibilidad
+    public void add(Object o) {
+        if (o != null) toAdd.add(o);
+    }
 
     public void commit(Project proj, String actionKey) {
-        if (pending.isEmpty()) return;
+        if (toAdd.isEmpty() && toRemove.isEmpty()) return;
+
         CircuitMutation m = new CircuitMutation(circuit);
-        for (Object o : pending) {
+        for (Object o : toAdd) {
             if (o instanceof Component c) m.add(c);
             else if (o instanceof Wire w) m.add(w);
         }
-        proj.doAction(m.toAction(Strings.getter(actionKey)));
-        pending.clear();
+        for (Object o : toRemove) {
+            if (o instanceof Component c) m.remove(c);
+            else if (o instanceof Wire w) m.remove(w);
+        }
+
+        if (!m.isEmpty()) {
+            proj.doAction(m.toAction(Strings.getter(actionKey)));
+        }
+
+        toAdd.clear();
+        toRemove.clear();
     }
 }
+

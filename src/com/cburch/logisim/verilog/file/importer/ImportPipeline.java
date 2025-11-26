@@ -179,7 +179,6 @@ final class ImportPipeline {
                     try {
                         BitLabeledTunnelRewriter.rewrite(proj, target, g);
                     } catch (Throwable t) {
-                        t.printStackTrace();
                         progress.onError(Strings.get("import.pipeline.error.rewrite", dto.name()), t);
                     }
 
@@ -193,8 +192,14 @@ final class ImportPipeline {
                     elk.root = null;
                 }
             } catch (Throwable t) {
-                t.printStackTrace();
-                progress.onError(Strings.get("import.pipeline.error.module", dto.name()), t);
+                String msg = Strings.get("import.pipeline.error.module", dto.name());
+                progress.onError(msg, t);
+
+                if (t instanceof RuntimeException re) {
+                    throw re;
+                } else {
+                    throw new RuntimeException(t);
+                }
             }
         }
 
@@ -261,7 +266,6 @@ final class ImportPipeline {
                     try {
                         BitLabeledTunnelRewriter.rewrite(proj, target, g);
                     } catch (Throwable t) {
-                        t.printStackTrace();
                         progress.onError(Strings.get("import.pipeline.error.rewrite", moduleName), t);
                     }
 
@@ -277,8 +281,8 @@ final class ImportPipeline {
                     elk.root = null;
                 }
             } catch (Throwable t) {
-                t.printStackTrace();
-                progress.onError(Strings.get("import.pipeline.error.materialize", moduleName), t);
+                String msg = Strings.get("import.pipeline.error.materialize", moduleName);
+                progress.onError(msg, t);
                 progress.onDone();
                 return;
             }

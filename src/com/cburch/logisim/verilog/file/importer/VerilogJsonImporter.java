@@ -185,7 +185,15 @@ public final class VerilogJsonImporter {
                         @Override public void onStart(String msg) { /* no-op */ }
                         @Override public void onPhase(String msg) { /* no-op */ }
                         @Override public void onDone() { /* no-op */ }
-                        @Override public void onError(String msg, Throwable cause) { cause.printStackTrace(); }
+                        @Override public void onError(String msg, Throwable cause) {
+                            JOptionPane.showMessageDialog(
+                                    proj.getFrame(),
+                                    Strings.get("import.json.error", cause.getMessage()),
+                                    Strings.get("import.json.error.title"),
+                                    JOptionPane.ERROR_MESSAGE
+                            );
+                            cause.printStackTrace();
+                        }
                     };
 
                     new ImportPipeline(

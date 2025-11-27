@@ -450,6 +450,12 @@ public class Canvas extends JPanel
 				return;
 			}
 
+            if (!proj.getSimulator().isRunning()) {
+                g.setColor(TICK_RATE_COLOR);
+                paintString(g, Strings.get("canvasSimulationDisabled"));
+                return;
+            }
+
 			computeViewportContents();
 			Dimension sz = getSize();
 			g.setColor(Value.WIDTH_ERROR_COLOR);

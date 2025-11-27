@@ -463,7 +463,6 @@ class CircuitWires {
                 WireBundle wb = bmap.getBundleAt(s);
 
                 if (wb == null) {
-                    System.out.println("Error");
                     // Bundle aún no asociado: pinta razonable
                     if (showState) {
                         g.setColor(Value.NIL_COLOR);

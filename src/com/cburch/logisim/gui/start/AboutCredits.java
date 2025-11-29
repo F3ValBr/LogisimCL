@@ -124,6 +124,10 @@ class AboutCredits extends JComponent {
 		lines.add(new CreditsLine(1, "Ilia Lilov"));
 		lines.add(new CreditsLine(2, "\u041C\u043E\u0441\u043A\u043E\u0432\u0441\u043A\u0438\u0439 \u0433\u043E\u0441\u0443\u0434\u0430\u0440\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0439"));
 		lines.add(new CreditsLine(2, "\u0443\u043D\u0438\u0432\u0435\u0440\u0441\u0438\u0442\u0435\u0442 \u043F\u0435\u0447\u0430\u0442\u0438"));
+        lines.add(new CreditsLine(0, Strings.get("creditsRoleAdditional")));
+        lines.add(new CreditsLine(1, "Esteban López Estrada"));
+        lines.add(new CreditsLine(1, "Felipe Valdebenito Bravo"));
+        lines.add(new CreditsLine(2, "Universidad de Chile"));
 		
 		/* If you fork Logisim, feel free to change the above lines, but
 		 * please do not change these last four lines! */

@@ -11,7 +11,10 @@ import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.tools.Tool;
 
 public class Gates extends Library {
-	private List<Tool> tools = null;
+
+    public static final String LIB_NAME = "Gates";
+
+    private List<Tool> tools = null;
 
 	public Gates() {
 		tools = Arrays.asList(new Tool[] {
@@ -31,7 +34,7 @@ public class Gates extends Library {
 	}
 
 	@Override
-	public String getName() { return "Gates"; }
+	public String getName() { return LIB_NAME; }
 
 	@Override
 	public String getDisplayName() { return Strings.get("gatesLibrary"); }

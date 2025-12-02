@@ -15,7 +15,10 @@ import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.tools.Tool;
 
 public class Io extends Library {
-	static final AttributeOption LABEL_CENTER = new AttributeOption("center", "center", Strings.getter("ioLabelCenter"));
+
+    public static final String LIB_NAME = "I/O";
+
+    static final AttributeOption LABEL_CENTER = new AttributeOption("center", "center", Strings.getter("ioLabelCenter"));
 	
 	static final Attribute<Color> ATTR_COLOR = Attributes.forColor("color",
 			Strings.getter("ioColorAttr"));
@@ -60,7 +63,7 @@ public class Io extends Library {
 	public Io() { }
 
 	@Override
-	public String getName() { return "I/O"; }
+	public String getName() { return LIB_NAME; }
 
 	@Override
 	public String getDisplayName() { return Strings.get("ioLibrary"); }

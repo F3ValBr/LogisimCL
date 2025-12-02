@@ -10,7 +10,10 @@ import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.tools.Tool;
 
 public class Memory extends Library {
-	protected static final int DELAY = 5;
+
+    public static final String LIB_NAME = "Memory";
+
+    protected static final int DELAY = 5;
 	
 	private static FactoryDescription[] DESCRIPTIONS = {
 		new FactoryDescription("D Flip-Flop", Strings.getter("dFlipFlopComponent"),
@@ -42,7 +45,7 @@ public class Memory extends Library {
 	public Memory() { }
 
 	@Override
-	public String getName() { return "Memory"; }
+	public String getName() { return LIB_NAME; }
 
 	@Override
 	public String getDisplayName() { return Strings.get("memoryLibrary"); }

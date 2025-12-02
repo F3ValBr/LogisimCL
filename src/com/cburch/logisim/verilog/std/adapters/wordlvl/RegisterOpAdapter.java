@@ -10,6 +10,7 @@ import com.cburch.logisim.data.*;
 import com.cburch.logisim.file.LogisimFile;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
+import com.cburch.logisim.std.memory.Memory;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.comp.auxiliary.CellType;
 import com.cburch.logisim.verilog.comp.auxiliary.FactoryLookup;
@@ -163,7 +164,7 @@ public final class RegisterOpAdapter extends AbstractComponentAdapter
     private static LibFactory pickRegisterFactory(Project proj) {
         LogisimFile lf = proj.getLogisimFile();
         if (lf == null) return null;
-        Library mem = lf.getLibrary("Memory");
+        Library mem = lf.getLibrary(Memory.LIB_NAME);
         if (mem == null) return null;
         ComponentFactory f = FactoryLookup.findFactory(mem, "Register");
         return (f == null) ? null : new LibFactory(mem, f);

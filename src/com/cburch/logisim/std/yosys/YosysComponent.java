@@ -12,6 +12,9 @@ import java.awt.*;
 import java.util.List;
 
 public class YosysComponent extends Library {
+
+    public static final String LIB_NAME = "Yosys Components";
+
     private static final FactoryDescription[] DESCRIPTIONS ={
             new FactoryDescription("Logical NOT Gate", Strings.getter("logicNotGateComponent"),
                     "logicnot.gif", "LogicalNotGate"),
@@ -36,7 +39,7 @@ public class YosysComponent extends Library {
     public YosysComponent(){ }
 
     @Override
-    public String getName() { return "Yosys Components"; }
+    public String getName() { return LIB_NAME; }
 
     @Override
     public String getDisplayName() { return Strings.get("yosysLibrary"); }

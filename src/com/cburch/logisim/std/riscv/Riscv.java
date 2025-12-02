@@ -7,6 +7,9 @@ import com.cburch.logisim.tools.Tool;
 import java.util.List;
 
 public class Riscv extends Library {
+
+    public static final String LIB_NAME = "Risc-V";
+
     private static final FactoryDescription[] DESCRIPTIONS = {
             new FactoryDescription(("RV32IM"),Strings.getter("processorRV32IM"),
                     "riscvproc.gif","RV32IM"),
@@ -17,7 +20,7 @@ public class Riscv extends Library {
 
     public Riscv(){ }
     @Override
-    public String getName() { return "Risc-V"; }
+    public String getName() { return LIB_NAME; }
 
     @Override
     public String getDisplayName() { return Strings.get("riscVLibrary"); }

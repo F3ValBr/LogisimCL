@@ -17,6 +17,8 @@ import com.cburch.logisim.tools.Tool;
 
 public class Wiring extends Library {
 
+    public static final String LIB_NAME = "Wiring";
+
 	static final AttributeOption GATE_TOP_LEFT
 		= new AttributeOption("tl", Strings.getter("wiringGateTopLeftOption"));
 	static final AttributeOption GATE_BOTTOM_RIGHT
@@ -54,7 +56,7 @@ public class Wiring extends Library {
 	public Wiring() { }
 
 	@Override
-	public String getName() { return "Wiring"; }
+	public String getName() { return LIB_NAME; }
 
 	@Override
 	public String getDisplayName() { return Strings.get("wiringLibrary"); }

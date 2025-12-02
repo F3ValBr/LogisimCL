@@ -19,7 +19,10 @@ import com.cburch.logisim.tools.Tool;
 import com.cburch.logisim.util.GraphicsUtil;
 
 public class Plexers extends Library {
-	public static final Attribute<BitWidth> ATTR_SELECT
+
+    public static final String LIB_NAME = "Plexers";
+
+    public static final Attribute<BitWidth> ATTR_SELECT
 		= Attributes.forBitWidth("select", Strings.getter("plexerSelectBitsAttr"), 1, 5);
 	public static final Object DEFAULT_SELECT = BitWidth.create(1);
 
@@ -66,7 +69,7 @@ public class Plexers extends Library {
 	public Plexers() { }
 
 	@Override
-	public String getName() { return "Plexers"; }
+	public String getName() { return LIB_NAME; }
 
 	@Override
 	public String getDisplayName() { return Strings.get("plexerLibrary"); }

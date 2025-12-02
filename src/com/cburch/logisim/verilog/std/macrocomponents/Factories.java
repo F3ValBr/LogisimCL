@@ -3,6 +3,10 @@ package com.cburch.logisim.verilog.std.macrocomponents;
 import com.cburch.logisim.comp.ComponentFactory;
 import com.cburch.logisim.file.LogisimFile;
 import com.cburch.logisim.proj.Project;
+import com.cburch.logisim.std.arith.Arithmetic;
+import com.cburch.logisim.std.gates.Gates;
+import com.cburch.logisim.std.plexers.Plexers;
+import com.cburch.logisim.std.wiring.Wiring;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.comp.auxiliary.FactoryLookup;
 
@@ -41,10 +45,10 @@ public final class Factories {
     public static Factories warmup(Project proj) {
         LogisimFile lf = proj.getLogisimFile();
         // Libs (con fallback por si cambian etiquetas en forks)
-        Library arithmetic = getLib(lf, "Arithmetic");
-        Library wiring     = getLib(lf, "Wiring");
-        Library gates      = getLib(lf, "Gates");
-        Library plexers    = getLib(lf, "Plexers");
+        Library arithmetic = getLib(lf, Arithmetic.LIB_NAME);
+        Library wiring     = getLib(lf, Wiring.LIB_NAME);
+        Library gates      = getLib(lf, Gates.LIB_NAME);
+        Library plexers    = getLib(lf, Plexers.LIB_NAME);
 
         ComponentFactory cmp        = find(arithmetic, "Comparator");
         ComponentFactory k          = find(wiring,     "Constant");

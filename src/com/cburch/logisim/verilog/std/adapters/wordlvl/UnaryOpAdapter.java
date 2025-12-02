@@ -9,6 +9,9 @@ import com.cburch.logisim.data.BitWidth;
 import com.cburch.logisim.data.Location;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
+import com.cburch.logisim.std.arith.Arithmetic;
+import com.cburch.logisim.std.gates.Gates;
+import com.cburch.logisim.std.yosys.YosysComponent;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.comp.auxiliary.CellType;
 import com.cburch.logisim.verilog.comp.auxiliary.FactoryLookup;
@@ -99,7 +102,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
 
             case BITWISE -> {
                 // Gates: Buffer / NOT Gate
-                Library gates = proj.getLogisimFile().getLibrary("Gates");
+                Library gates = proj.getLogisimFile().getLibrary(Gates.LIB_NAME);
                 if (gates == null) return null;
                 String gateName = switch (op) {
                     case BUF -> "Buffer";
@@ -113,7 +116,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
 
             case LOGIC -> {
                 // Tu librería con lógicas de Yosys (Logical NOT Gate)
-                Library yosysLib = proj.getLogisimFile().getLibrary("Yosys Components");
+                Library yosysLib = proj.getLogisimFile().getLibrary(YosysComponent.LIB_NAME);
                 if (yosysLib == null) return null;
                 String name = (op == UnaryOp.LOGIC_NOT) ? "Logical NOT Gate" : null;
                 if (name == null) return null;
@@ -124,13 +127,13 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
             case ARITH -> {
                 switch (op) {
                     case NEG -> {
-                        Library arith = proj.getLogisimFile().getLibrary("Arithmetic");
+                        Library arith = proj.getLogisimFile().getLibrary(Arithmetic.LIB_NAME);
                         if (arith == null) return null;
                         ComponentFactory f = FactoryLookup.findFactory(arith, "Negator");
                         return (f == null) ? null : new LibFactory(arith, f);
                     }
                     case POS -> {
-                        Library gates = proj.getLogisimFile().getLibrary("Gates");
+                        Library gates = proj.getLogisimFile().getLibrary(Gates.LIB_NAME);
                         if (gates == null) return null;
                         ComponentFactory f = FactoryLookup.findFactory(gates, "Buffer");
                         return (f == null) ? null : new LibFactory(gates, f);

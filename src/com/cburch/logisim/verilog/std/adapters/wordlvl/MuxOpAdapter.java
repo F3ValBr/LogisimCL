@@ -12,7 +12,9 @@ import com.cburch.logisim.data.Location;
 import com.cburch.logisim.file.LogisimFile;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.proj.Project;
+import com.cburch.logisim.std.gates.Gates;
 import com.cburch.logisim.std.plexers.Plexers;
+import com.cburch.logisim.std.yosys.YosysComponent;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.comp.auxiliary.CellType;
 import com.cburch.logisim.verilog.comp.auxiliary.FactoryLookup;
@@ -116,37 +118,37 @@ public final class MuxOpAdapter extends AbstractComponentAdapter
         LogisimFile lf = proj.getLogisimFile();
         switch (op) {
             case MUX -> {
-                Library plex = lf.getLibrary("Plexers");
+                Library plex = lf.getLibrary(Plexers.LIB_NAME);
                 if (plex == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(plex, "Multiplexer");
                 return (f == null) ? null : new LibFactory(plex, f);
             }
             case DEMUX -> {
-                Library plex = lf.getLibrary("Plexers");
+                Library plex = lf.getLibrary(Plexers.LIB_NAME);
                 if (plex == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(plex, "Demultiplexer");
                 return (f == null) ? null : new LibFactory(plex, f);
             }
             case TRIBUF -> {
-                Library gates = lf.getLibrary("Gates");
+                Library gates = lf.getLibrary(Gates.LIB_NAME);
                 if (gates == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(gates, "Controlled Buffer");
                 return (f == null) ? null : new LibFactory(gates, f);
             }
             case BWMUX -> {
-                Library yosys = lf.getLibrary("Yosys Components");
+                Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                 if (yosys == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(yosys, "Bitwise Multiplexer");
                 return (f == null) ? null : new LibFactory(yosys, f);
             }
             case PMUX -> {
-                Library yosys = lf.getLibrary("Yosys Components");
+                Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                 if (yosys == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(yosys, "Priority Multiplexer");
                 return (f == null) ? null : new LibFactory(yosys, f);
             }
             case BMUX -> {
-                Library yosys = lf.getLibrary("Yosys Components");
+                Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                 if (yosys == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(yosys, "Binary Multiplexer");
                 return (f == null) ? null : new LibFactory(yosys, f);

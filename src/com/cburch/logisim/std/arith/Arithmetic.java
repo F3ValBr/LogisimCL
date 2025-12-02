@@ -10,7 +10,10 @@ import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.tools.Tool;
 
 public class Arithmetic extends Library {
-	private static final FactoryDescription[] DESCRIPTIONS = {
+
+    public static final String LIB_NAME = "Arithmetic";
+
+    private static final FactoryDescription[] DESCRIPTIONS = {
 		new FactoryDescription("Adder", Strings.getter("adderComponent"),
 				"adder.gif", "Adder"),
 		new FactoryDescription("Subtractor", Strings.getter("subtractorComponent"),
@@ -36,7 +39,7 @@ public class Arithmetic extends Library {
 	public Arithmetic() { }
 
 	@Override
-	public String getName() { return "Arithmetic"; }
+	public String getName() { return LIB_NAME; }
 
 	@Override
 	public String getDisplayName() { return Strings.get("arithmeticLibrary"); }

@@ -10,6 +10,7 @@ import com.cburch.logisim.file.LogisimFile;
 import com.cburch.logisim.instance.PortGeom;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.proj.Project;
+import com.cburch.logisim.std.memory.Memory;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.comp.auxiliary.CellType;
 import com.cburch.logisim.verilog.comp.auxiliary.FactoryLookup;
@@ -167,7 +168,7 @@ public final class RegisterGateOpAdapter extends AbstractComponentAdapter
     private static LibFactory pickRegisterFactory(Project proj) {
         LogisimFile f = proj.getLogisimFile();
         if (f == null) return null;
-        Library mem = f.getLibrary("Memory");
+        Library mem = f.getLibrary(Memory.LIB_NAME);
         if (mem == null) return null;
         ComponentFactory cf = FactoryLookup.findFactory(mem, "Register");
         return (cf == null) ? null : new LibFactory(mem, cf);

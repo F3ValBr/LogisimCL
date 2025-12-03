@@ -15,23 +15,57 @@ public class YosysComponent extends Library {
 
     public static final String LIB_NAME = "Yosys Components";
 
-    private static final FactoryDescription[] DESCRIPTIONS ={
-            new FactoryDescription(LogicalNotGate._ID,      Strings.getter("logicNotGateComponent"),
-                    "logicnot.gif",         LogicalNotGate.class.getSimpleName()),
-            new FactoryDescription(LogicalAndGate._ID,      Strings.getter("logicAndGateComponent"),
-                    "logicand.gif",         LogicalAndGate.class.getSimpleName()),
-            new FactoryDescription(LogicalOrGate._ID,       Strings.getter("logicOrGateComponent"),
-                    "logicor.gif",          LogicalOrGate.class.getSimpleName()),
-            new FactoryDescription(Exponent._ID,            Strings.getter("exponentComponent"),
-                    "exponent.gif",         Exponent.class.getSimpleName()),
-            new FactoryDescription(DynamicShifter._ID,      Strings.getter("dynamicShifterComponent"),
-                    "dynamicShifter.gif",   DynamicShifter.class.getSimpleName()),
-            new FactoryDescription(BitwiseMultiplexer._ID,  Strings.getter("bwmuxComponent"),
-                    "bwmultiplexer.gif",    BitwiseMultiplexer.class.getSimpleName()),
-            new FactoryDescription(PriorityMultiplexer._ID, Strings.getter("pmuxComponent"),
-                    "pmultiplexer.gif",     PriorityMultiplexer.class.getSimpleName()),
-            new FactoryDescription(BinaryMultiplexer._ID,   Strings.getter("bmuxComponent"),
-                    "bmultiplexer.gif",     BinaryMultiplexer.class.getSimpleName()),
+    // ==== Public IDs for Logic Components ====
+    public static final String LOGIC_NOT_ID      = LogicalNotGate._ID;
+    public static final String LOGIC_AND_ID      = LogicalAndGate._ID;
+    public static final String LOGIC_OR_ID       = LogicalOrGate._ID;
+    public static final String EXPONENT_ID       = Exponent._ID;
+    public static final String DYNAMIC_SHIFT_ID  = DynamicShifter._ID;
+    public static final String BITWISE_MUX_ID    = BitwiseMultiplexer._ID;
+    public static final String PRIORITY_MUX_ID   = PriorityMultiplexer._ID;
+    public static final String BINARY_MUX_ID     = BinaryMultiplexer._ID;
+
+    private static final FactoryDescription[] DESCRIPTIONS = {
+        new FactoryDescription(LOGIC_NOT_ID,
+            Strings.getter("logicNotGateComponent"),
+            "logicnot.gif",
+            LogicalNotGate.class.getSimpleName()
+        ),
+        new FactoryDescription(LOGIC_AND_ID,
+            Strings.getter("logicAndGateComponent"),
+            "logicand.gif",
+            LogicalAndGate.class.getSimpleName()
+        ),
+        new FactoryDescription(LOGIC_OR_ID,
+            Strings.getter("logicOrGateComponent"),
+            "logicor.gif",
+            LogicalOrGate.class.getSimpleName()
+        ),
+        new FactoryDescription(EXPONENT_ID,
+            Strings.getter("exponentComponent"),
+            "exponent.gif",
+            Exponent.class.getSimpleName()
+        ),
+        new FactoryDescription(DYNAMIC_SHIFT_ID,
+            Strings.getter("dynamicShifterComponent"),
+            "dynamicShifter.gif",
+            DynamicShifter.class.getSimpleName()
+        ),
+        new FactoryDescription(BITWISE_MUX_ID,
+            Strings.getter("bwmuxComponent"),
+            "bwmultiplexer.gif",
+            BitwiseMultiplexer.class.getSimpleName()
+        ),
+        new FactoryDescription(PRIORITY_MUX_ID,
+            Strings.getter("pmuxComponent"),
+            "pmultiplexer.gif",
+            PriorityMultiplexer.class.getSimpleName()
+        ),
+        new FactoryDescription(BINARY_MUX_ID,
+            Strings.getter("bmuxComponent"),
+            "bmultiplexer.gif",
+            BinaryMultiplexer.class.getSimpleName()
+        ),
     };
 
     private List<Tool> tools = null;

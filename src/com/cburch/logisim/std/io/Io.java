@@ -38,27 +38,62 @@ public class Io extends Library {
 			Strings.getter("ioActiveAttr"));
 
 	static final Color DEFAULT_BACKGROUND = new Color(255, 255, 255, 0);
-	
-	private static FactoryDescription[] DESCRIPTIONS = {
-		new FactoryDescription(Button._ID,          Strings.getter("buttonComponent"),
-				"button.gif",   Button.class.getSimpleName()),
-		new FactoryDescription(Joystick._ID,        Strings.getter("joystickComponent"),
-				"joystick.gif", Joystick.class.getSimpleName()),
-		new FactoryDescription(Keyboard._ID,        Strings.getter("keyboardComponent"),
-				"keyboard.gif", Keyboard.class.getSimpleName()),
-		new FactoryDescription(Led._ID,             Strings.getter("ledComponent"),
-				"led.gif",      Led.class.getSimpleName()),
-		new FactoryDescription(SevenSegment._ID,    Strings.getter("sevenSegmentComponent"),
-				"7seg.gif",     SevenSegment.class.getSimpleName()),
-		new FactoryDescription(HexDigit._ID,        Strings.getter("hexDigitComponent"),
-				"hexdig.gif",   HexDigit.class.getSimpleName()),
-		new FactoryDescription(DotMatrix._ID,       Strings.getter("dotMatrixComponent"),
-				"dotmat.gif",   DotMatrix.class.getSimpleName()),
-		new FactoryDescription(Tty._ID,             Strings.getter("ttyComponent"),
-				"tty.gif",      Tty.class.getSimpleName()),
-	};
 
-	private List<Tool> tools = null;
+    // ==== IDs públicos para IO ====
+    public static final String BUTTON_ID        = Button._ID;
+    public static final String JOYSTICK_ID      = Joystick._ID;
+    public static final String KEYBOARD_ID      = Keyboard._ID;
+    public static final String LED_ID           = Led._ID;
+    public static final String SEVEN_SEGMENT_ID = SevenSegment._ID;
+    public static final String HEX_DIGIT_ID     = HexDigit._ID;
+    public static final String DOT_MATRIX_ID    = DotMatrix._ID;
+    public static final String TTY_ID           = Tty._ID;
+
+    // ==== Descriptions ====
+    private static final FactoryDescription[] DESCRIPTIONS = {
+        new FactoryDescription(BUTTON_ID,
+            Strings.getter("buttonComponent"),
+            "button.gif",
+            Button.class.getSimpleName()
+        ),
+        new FactoryDescription(JOYSTICK_ID,
+            Strings.getter("joystickComponent"),
+            "joystick.gif",
+            Joystick.class.getSimpleName()
+        ),
+        new FactoryDescription(KEYBOARD_ID,
+            Strings.getter("keyboardComponent"),
+            "keyboard.gif",
+            Keyboard.class.getSimpleName()
+        ),
+        new FactoryDescription(LED_ID,
+            Strings.getter("ledComponent"),
+            "led.gif",
+            Led.class.getSimpleName()
+        ),
+        new FactoryDescription(SEVEN_SEGMENT_ID,
+            Strings.getter("sevenSegmentComponent"),
+            "7seg.gif",
+            SevenSegment.class.getSimpleName()
+        ),
+        new FactoryDescription(HEX_DIGIT_ID,
+            Strings.getter("hexDigitComponent"),
+            "hexdig.gif",
+            HexDigit.class.getSimpleName()
+        ),
+        new FactoryDescription(DOT_MATRIX_ID,
+            Strings.getter("dotMatrixComponent"),
+            "dotmat.gif",
+            DotMatrix.class.getSimpleName()
+        ),
+        new FactoryDescription(TTY_ID,
+            Strings.getter("ttyComponent"),
+            "tty.gif",
+            Tty.class.getSimpleName()
+        ),
+    };
+
+    private List<Tool> tools = null;
 
 	public Io() { }
 

@@ -50,21 +50,44 @@ public class Plexers extends Library {
 			new AttributeOption[] { SELECT_BOTTOM_LEFT, SELECT_TOP_RIGHT });
 
 	protected static final int DELAY = 3;
-	
-	private static final FactoryDescription[] DESCRIPTIONS = {
-		new FactoryDescription(Multiplexer._ID,     Strings.getter("multiplexerComponent"),
-				"multiplexer.gif",      Multiplexer.class.getSimpleName()),
-		new FactoryDescription(Demultiplexer._ID,   Strings.getter("demultiplexerComponent"),
-				"demultiplexer.gif",    Demultiplexer.class.getSimpleName()),
-		new FactoryDescription(Decoder._ID,         Strings.getter("decoderComponent"),
-				"decoder.gif",          Decoder.class.getSimpleName()),
-		new FactoryDescription(PriorityEncoder._ID, Strings.getter("priorityEncoderComponent"),
-				"priencod.gif",         PriorityEncoder.class.getSimpleName()),
-		new FactoryDescription(BitSelector._ID,     Strings.getter("bitSelectorComponent"),
-				"bitSelector.gif",      BitSelector.class.getSimpleName()),
-	};
 
-	private List<Tool> tools = null;
+    // ==== IDs públicos de Plexers ====
+    public static final String MULTIPLEXER_ID      = Multiplexer._ID;
+    public static final String DEMULTIPLEXER_ID    = Demultiplexer._ID;
+    public static final String DECODER_ID          = Decoder._ID;
+    public static final String PRIORITYENC_ID      = PriorityEncoder._ID;
+    public static final String BITSELECTOR_ID      = BitSelector._ID;
+
+    // ==== Descriptions ====
+    private static final FactoryDescription[] DESCRIPTIONS = {
+        new FactoryDescription(MULTIPLEXER_ID,
+            Strings.getter("multiplexerComponent"),
+            "multiplexer.gif",
+            Multiplexer.class.getSimpleName()
+        ),
+        new FactoryDescription(DEMULTIPLEXER_ID,
+            Strings.getter("demultiplexerComponent"),
+            "demultiplexer.gif",
+            Demultiplexer.class.getSimpleName()
+        ),
+        new FactoryDescription(DECODER_ID,
+            Strings.getter("decoderComponent"),
+            "decoder.gif",
+            Decoder.class.getSimpleName()
+        ),
+        new FactoryDescription(PRIORITYENC_ID,
+            Strings.getter("priorityEncoderComponent"),
+            "priencod.gif",
+            PriorityEncoder.class.getSimpleName()
+        ),
+        new FactoryDescription(BITSELECTOR_ID,
+            Strings.getter("bitSelectorComponent"),
+            "bitSelector.gif",
+            BitSelector.class.getSimpleName()
+        ),
+    };
+
+    private List<Tool> tools = null;
 
 	public Plexers() { }
 

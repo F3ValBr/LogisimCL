@@ -40,22 +40,22 @@ public class Io extends Library {
 	static final Color DEFAULT_BACKGROUND = new Color(255, 255, 255, 0);
 	
 	private static FactoryDescription[] DESCRIPTIONS = {
-		new FactoryDescription("Button", Strings.getter("buttonComponent"),
-				"button.gif", "Button"),
-		new FactoryDescription("Joystick", Strings.getter("joystickComponent"),
-				"joystick.gif", "Joystick"),
-		new FactoryDescription("Keyboard", Strings.getter("keyboardComponent"),
-				"keyboard.gif", "Keyboard"),
-		new FactoryDescription("LED", Strings.getter("ledComponent"),
-				"led.gif", "Led"),
-		new FactoryDescription("7-Segment Display", Strings.getter("sevenSegmentComponent"),
-				"7seg.gif", "SevenSegment"),
-		new FactoryDescription("Hex Digit Display", Strings.getter("hexDigitComponent"),
-				"hexdig.gif", "HexDigit"),
-		new FactoryDescription("DotMatrix", Strings.getter("dotMatrixComponent"),
-				"dotmat.gif", "DotMatrix"),
-		new FactoryDescription("TTY", Strings.getter("ttyComponent"),
-				"tty.gif", "Tty"),
+		new FactoryDescription(Button._ID,          Strings.getter("buttonComponent"),
+				"button.gif",   Button.class.getSimpleName()),
+		new FactoryDescription(Joystick._ID,        Strings.getter("joystickComponent"),
+				"joystick.gif", Joystick.class.getSimpleName()),
+		new FactoryDescription(Keyboard._ID,        Strings.getter("keyboardComponent"),
+				"keyboard.gif", Keyboard.class.getSimpleName()),
+		new FactoryDescription(Led._ID,             Strings.getter("ledComponent"),
+				"led.gif",      Led.class.getSimpleName()),
+		new FactoryDescription(SevenSegment._ID,    Strings.getter("sevenSegmentComponent"),
+				"7seg.gif",     SevenSegment.class.getSimpleName()),
+		new FactoryDescription(HexDigit._ID,        Strings.getter("hexDigitComponent"),
+				"hexdig.gif",   HexDigit.class.getSimpleName()),
+		new FactoryDescription(DotMatrix._ID,       Strings.getter("dotMatrixComponent"),
+				"dotmat.gif",   DotMatrix.class.getSimpleName()),
+		new FactoryDescription(Tty._ID,             Strings.getter("ttyComponent"),
+				"tty.gif",      Tty.class.getSimpleName()),
 	};
 
 	private List<Tool> tools = null;

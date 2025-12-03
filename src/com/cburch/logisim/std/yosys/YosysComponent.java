@@ -16,22 +16,22 @@ public class YosysComponent extends Library {
     public static final String LIB_NAME = "Yosys Components";
 
     private static final FactoryDescription[] DESCRIPTIONS ={
-            new FactoryDescription("Logical NOT Gate", Strings.getter("logicNotGateComponent"),
-                    "logicnot.gif", "LogicalNotGate"),
-            new FactoryDescription("Logical AND Gate", Strings.getter("logicAndGateComponent"),
-                    "logicand.gif", "LogicalAndGate"),
-            new FactoryDescription("Logical OR Gate", Strings.getter("logicOrGateComponent"),
-                    "logicor.gif", "LogicalOrGate"),
-            new FactoryDescription("Exponent", Strings.getter("exponentComponent"),
-                    "exponent.gif", "Exponent"),
-            new FactoryDescription("Dynamic Shifter", Strings.getter("dynamicShifterComponent"),
-                    "dynamicShifter.gif", "DynamicShifter"),
-            new FactoryDescription("Bitwise Multiplexer", Strings.getter("bwmuxComponent"),
-                    "bwmultiplexer.gif", "BitwiseMultiplexer"),
-            new FactoryDescription("Priority Multiplexer", Strings.getter("pmuxComponent"),
-                    "pmultiplexer.gif", "PriorityMultiplexer"),
-            new FactoryDescription("Binary Multiplexer", Strings.getter("bmuxComponent"),
-                    "bmultiplexer.gif", "BinaryMultiplexer"),
+            new FactoryDescription(LogicalNotGate._ID,      Strings.getter("logicNotGateComponent"),
+                    "logicnot.gif",         LogicalNotGate.class.getSimpleName()),
+            new FactoryDescription(LogicalAndGate._ID,      Strings.getter("logicAndGateComponent"),
+                    "logicand.gif",         LogicalAndGate.class.getSimpleName()),
+            new FactoryDescription(LogicalOrGate._ID,       Strings.getter("logicOrGateComponent"),
+                    "logicor.gif",          LogicalOrGate.class.getSimpleName()),
+            new FactoryDescription(Exponent._ID,            Strings.getter("exponentComponent"),
+                    "exponent.gif",         Exponent.class.getSimpleName()),
+            new FactoryDescription(DynamicShifter._ID,      Strings.getter("dynamicShifterComponent"),
+                    "dynamicShifter.gif",   DynamicShifter.class.getSimpleName()),
+            new FactoryDescription(BitwiseMultiplexer._ID,  Strings.getter("bwmuxComponent"),
+                    "bwmultiplexer.gif",    BitwiseMultiplexer.class.getSimpleName()),
+            new FactoryDescription(PriorityMultiplexer._ID, Strings.getter("pmuxComponent"),
+                    "pmultiplexer.gif",     PriorityMultiplexer.class.getSimpleName()),
+            new FactoryDescription(BinaryMultiplexer._ID,   Strings.getter("bmuxComponent"),
+                    "bmultiplexer.gif",     BinaryMultiplexer.class.getSimpleName()),
     };
 
     private List<Tool> tools = null;

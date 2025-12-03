@@ -11,10 +11,10 @@ public class Riscv extends Library {
     public static final String LIB_NAME = "Risc-V";
 
     private static final FactoryDescription[] DESCRIPTIONS = {
-            new FactoryDescription(("RV32IM"),Strings.getter("processorRV32IM"),
-                    "riscvproc.gif","RV32IM"),
-            new FactoryDescription(("RV32IM_MIcro"),Strings.getter("processorRV32IMMicro"),
-                    "riscvprocmicro.gif","RV32IMMicro")
+            new FactoryDescription(RV32IM._ID,          Strings.getter("processorRV32IM"),
+                    "riscvproc.gif",        RV32IM.class.getSimpleName()),
+            new FactoryDescription(RV32IMMicro._ID,     Strings.getter("processorRV32IMMicro"),
+                    "riscvprocmicro.gif",   RV32IMMicro.class.getSimpleName()),
     };
     private List<Tool> tools = null;
 

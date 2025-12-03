@@ -13,6 +13,9 @@ import java.math.BigInteger;
  *  - EXP se interpreta SIEMPRE como UNSIGNED
  */
 public class Exponent extends InstanceFactory {
+
+    public static final String _ID = "Exponent";
+
     static final int PER_DELAY = 1;
 
     static final int IN0 = 0; // BASE
@@ -31,7 +34,7 @@ public class Exponent extends InstanceFactory {
                     new AttributeOption[]{ MODE_UNSIGNED, MODE_SIGNED, MODE_AUTO });
 
     public Exponent() {
-        super("Exponent", Strings.getter("exponentComponent"));
+        super(_ID, Strings.getter("exponentComponent"));
         setAttributes(
                 new Attribute[]{ StdAttr.WIDTH, SIGN_MODE },
                 new Object[]  { BitWidth.create(8), MODE_AUTO }

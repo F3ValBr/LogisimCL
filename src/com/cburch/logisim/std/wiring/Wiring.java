@@ -39,16 +39,16 @@ public class Wiring extends Library {
 	};
 	
 	private static FactoryDescription[] DESCRIPTIONS = {
-		new FactoryDescription("Power", Strings.getter("powerComponent"),
-				"power.gif", "Power"),
-		new FactoryDescription("Ground", Strings.getter("groundComponent"),
-				"ground.gif", "Ground"),
-		new FactoryDescription("Transistor", Strings.getter("transistorComponent"),
-				"trans0.gif", "Transistor"),
-		new FactoryDescription("Transmission Gate", Strings.getter("transmissionGateComponent"),
-				"transmis.gif", "TransmissionGate"),
-		new FactoryDescription("Bit Extender", Strings.getter("extenderComponent"),
-				"extender.gif", "BitExtender"),
+		new FactoryDescription(Power._ID,               Strings.getter("powerComponent"),
+				"power.gif",    Power.class.getSimpleName()),
+		new FactoryDescription(Ground._ID,              Strings.getter("groundComponent"),
+				"ground.gif",   Ground.class.getSimpleName()),
+		new FactoryDescription(Transistor._ID,          Strings.getter("transistorComponent"),
+				"trans0.gif",   Transistor.class.getSimpleName()),
+		new FactoryDescription(TransmissionGate._ID,    Strings.getter("transmissionGateComponent"),
+				"transmis.gif", TransmissionGate.class.getSimpleName()),
+		new FactoryDescription(BitExtender._ID,         Strings.getter("extenderComponent"),
+				"extender.gif", BitExtender.class.getSimpleName()),
 	};
 
 	private List<Tool> tools = null;

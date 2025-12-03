@@ -174,10 +174,10 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                 Library gates = lf.getLibrary(Gates.LIB_NAME);
                 if (gates == null) return null;
                 String gateName = switch (op) {
-                    case AND  -> "AND Gate";
-                    case OR   -> "OR Gate";
-                    case XOR  -> "XOR Gate";
-                    case XNOR -> "XNOR Gate";
+                    case AND  -> Gates.AND_ID;
+                    case OR   -> Gates.OR_ID;
+                    case XOR  -> Gates.XOR_ID;
+                    case XNOR -> Gates.XNOR_ID;
                     default   -> null;
                 };
                 ComponentFactory f = FactoryLookup.findFactory(gates, gateName);
@@ -188,8 +188,8 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                 Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                 if (yosys == null) return null;
                 String gateName = switch (op) {
-                    case LOGIC_AND -> "Logical AND Gate";
-                    case LOGIC_OR  -> "Logical OR Gate";
+                    case LOGIC_AND -> YosysComponent.LOGIC_AND_ID;
+                    case LOGIC_OR  -> YosysComponent.LOGIC_OR_ID;
                     default        -> null;
                 };
                 ComponentFactory f = FactoryLookup.findFactory(yosys, gateName);
@@ -199,17 +199,17 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                 if (op == BinaryOp.POW) {
                     Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                     if (yosys == null) return null;
-                    ComponentFactory f = FactoryLookup.findFactory(yosys, "Exponent");
+                    ComponentFactory f = FactoryLookup.findFactory(yosys, YosysComponent.EXPONENT_ID);
                     return (f == null) ? null : new LibFactory(yosys, f);
                 }
                 // Aritméticos (suma/resta/mult/div/mod/…)
                 Library arith = lf.getLibrary(Arithmetic.LIB_NAME);
                 if (arith == null) return null;
                 String name = switch (op) {
-                    case ADD -> "Adder";
-                    case SUB -> "Subtractor";
-                    case MUL -> "Multiplier";
-                    case DIV, MOD, DIVFLOOR, MODFLOOR -> "Divider";
+                    case ADD -> Arithmetic.ADDER_ID;
+                    case SUB -> Arithmetic.SUBTRACTOR_ID;
+                    case MUL -> Arithmetic.MULTIPLIER_ID;
+                    case DIV, MOD, DIVFLOOR, MODFLOOR -> Arithmetic.DIVIDER_ID;
                     default -> null;
                 };
                 ComponentFactory f = FactoryLookup.findFactory(arith, name);
@@ -219,7 +219,7 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                 // Comparadores → usar Comparator (con pines eq/lt/gt)
                 Library arith = lf.getLibrary(Arithmetic.LIB_NAME);
                 if (arith == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(arith, "Comparator");
+                ComponentFactory f = FactoryLookup.findFactory(arith, Arithmetic.COMPARATOR_ID);
                 return (f == null) ? null : new LibFactory(arith, f);
             }
             case SHIFT -> {
@@ -230,12 +230,12 @@ public final class BinaryOpAdapter extends AbstractComponentAdapter
                     case SHIFT, SHIFTX -> {
                         lib = lf.getLibrary(YosysComponent.LIB_NAME);
                         if (lib != null)
-                            f = FactoryLookup.findFactory(lib, "Dynamic Shifter");
+                            f = FactoryLookup.findFactory(lib, YosysComponent.DYNAMIC_SHIFT_ID);
                     }
                     default -> {
                         lib = lf.getLibrary(Arithmetic.LIB_NAME);
                         if (lib != null)
-                            f = FactoryLookup.findFactory(lib, "Shifter");
+                            f = FactoryLookup.findFactory(lib, Arithmetic.SHIFTER_ID);
                     }
                 }
 

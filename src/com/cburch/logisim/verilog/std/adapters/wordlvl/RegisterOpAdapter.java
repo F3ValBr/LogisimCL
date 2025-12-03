@@ -166,7 +166,7 @@ public final class RegisterOpAdapter extends AbstractComponentAdapter
         if (lf == null) return null;
         Library mem = lf.getLibrary(Memory.LIB_NAME);
         if (mem == null) return null;
-        ComponentFactory f = FactoryLookup.findFactory(mem, "Register");
+        ComponentFactory f = FactoryLookup.findFactory(mem, Memory.REGISTER_ID);
         return (f == null) ? null : new LibFactory(mem, f);
     }
 

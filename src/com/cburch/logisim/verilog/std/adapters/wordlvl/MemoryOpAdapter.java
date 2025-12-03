@@ -210,7 +210,7 @@ public final class MemoryOpAdapter extends AbstractComponentAdapter
 
     private static LibFactory pickMemoryFactory(Project proj, boolean hasWrite) {
         if (proj == null || proj.getLogisimFile() == null) return null;
-        String compName = hasWrite ? "RAM" : "ROM";
+        String compName = hasWrite ? Memory.RAM_ID : Memory.ROM_ID;
 
         Library mem = proj.getLogisimFile().getLibrary(Memory.LIB_NAME);
         if (mem != null) {

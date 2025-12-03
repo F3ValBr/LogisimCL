@@ -89,10 +89,6 @@ public final class MuxOpAdapter extends AbstractComponentAdapter
                 attrs.setValue(Plexers.ATTR_ENABLE, Boolean.FALSE);
             } catch (Exception ignore) { }
 
-            // Nota: Multiplexer/Demultiplexer en Logisim determinan #entradas/salidas con los "Select Bits".
-            // Para $mux/$demux de 2-vías, suele ser el valor por defecto (1). Si quisieras setearlo:
-            // usa el atributo de “Select Bits” si tu build lo expone. Lo dejamos así por compatibilidad.
-
             Component comp = addComponent(proj, circ, g, lf.factory, where, attrs);
 
             // Mapa nombre->índice específico de ESTA instancia (usa library + factory + instance)
@@ -120,37 +116,37 @@ public final class MuxOpAdapter extends AbstractComponentAdapter
             case MUX -> {
                 Library plex = lf.getLibrary(Plexers.LIB_NAME);
                 if (plex == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(plex, "Multiplexer");
+                ComponentFactory f = FactoryLookup.findFactory(plex, Plexers.MULTIPLEXER_ID);
                 return (f == null) ? null : new LibFactory(plex, f);
             }
             case DEMUX -> {
                 Library plex = lf.getLibrary(Plexers.LIB_NAME);
                 if (plex == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(plex, "Demultiplexer");
+                ComponentFactory f = FactoryLookup.findFactory(plex, Plexers.DEMULTIPLEXER_ID);
                 return (f == null) ? null : new LibFactory(plex, f);
             }
             case TRIBUF -> {
                 Library gates = lf.getLibrary(Gates.LIB_NAME);
                 if (gates == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(gates, "Controlled Buffer");
+                ComponentFactory f = FactoryLookup.findFactory(gates, Gates.CONTROLLED_BUFFER_ID);
                 return (f == null) ? null : new LibFactory(gates, f);
             }
             case BWMUX -> {
                 Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                 if (yosys == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(yosys, "Bitwise Multiplexer");
+                ComponentFactory f = FactoryLookup.findFactory(yosys, YosysComponent.BITWISE_MUX_ID);
                 return (f == null) ? null : new LibFactory(yosys, f);
             }
             case PMUX -> {
                 Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                 if (yosys == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(yosys, "Priority Multiplexer");
+                ComponentFactory f = FactoryLookup.findFactory(yosys, YosysComponent.PRIORITY_MUX_ID);
                 return (f == null) ? null : new LibFactory(yosys, f);
             }
             case BMUX -> {
                 Library yosys = lf.getLibrary(YosysComponent.LIB_NAME);
                 if (yosys == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(yosys, "Binary Multiplexer");
+                ComponentFactory f = FactoryLookup.findFactory(yosys, YosysComponent.BINARY_MUX_ID);
                 return (f == null) ? null : new LibFactory(yosys, f);
             }
             default -> { return null; }

@@ -11,6 +11,8 @@ import com.cburch.logisim.file.LogisimFile;
 import com.cburch.logisim.instance.PortGeom;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.proj.Project;
+import com.cburch.logisim.std.gates.Gates;
+import com.cburch.logisim.std.plexers.Plexers;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.verilog.comp.auxiliary.CellType;
 import com.cburch.logisim.verilog.comp.auxiliary.FactoryLookup;
@@ -114,18 +116,18 @@ public final class GateOpAdapter extends AbstractComponentAdapter
 
             // === 1) Puertas simples (Gates) ===
             case SIMPLE -> {
-                Library lib = lf.getLibrary("Gates");
+                Library lib = lf.getLibrary(Gates.LIB_NAME);
                 if (lib == null) return null;
 
                 String name = switch (op) {
-                    case AND  -> "AND Gate";
-                    case OR   -> "OR Gate";
-                    case XOR  -> "XOR Gate";
-                    case XNOR -> "XNOR Gate";
-                    case NAND -> "NAND Gate";
-                    case NOR  -> "NOR Gate";
-                    case NOT  -> "NOT Gate";
-                    case BUF  -> "Buffer";
+                    case AND  -> Gates.AND_ID;
+                    case OR   -> Gates.OR_ID;
+                    case XOR  -> Gates.XOR_ID;
+                    case XNOR -> Gates.XNOR_ID;
+                    case NAND -> Gates.NAND_ID;
+                    case NOR  -> Gates.NOR_ID;
+                    case NOT  -> Gates.NOT_ID;
+                    case BUF  -> Gates.BUFFER_ID;
                     default   -> null;
                 };
                 if (name == null) return null;
@@ -136,12 +138,12 @@ public final class GateOpAdapter extends AbstractComponentAdapter
 
             // === 2) Combinadas (AOI/OAI) — por ahora placeholder a AND/OR base ===
             case COMBINED -> {
-                Library lib = lf.getLibrary("Gates");
+                Library lib = lf.getLibrary(Gates.LIB_NAME);
                 if (lib == null) return null;
 
                 String base = switch (op) {
-                    case ANDNOT -> "AND Gate";
-                    case ORNOT  -> "OR Gate";
+                    case ANDNOT -> Gates.AND_ID;
+                    case ORNOT  -> Gates.OR_ID;
                     default -> null;
                 };
                 if (base == null) return null;
@@ -152,9 +154,9 @@ public final class GateOpAdapter extends AbstractComponentAdapter
 
             // === 3) MUX family ===
             case MUX_FAMILY -> {
-                Library lib = lf.getLibrary("Plexers");
+                Library lib = lf.getLibrary(Plexers.LIB_NAME);
                 if (lib == null) return null;
-                ComponentFactory f = FactoryLookup.findFactory(lib, "Multiplexer");
+                ComponentFactory f = FactoryLookup.findFactory(lib, Plexers.MULTIPLEXER_ID);
                 return (f == null) ? null : new LibFactory(lib, f);
             }
 

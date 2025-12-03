@@ -50,16 +50,16 @@ public final class Factories {
         Library gates      = getLib(lf, Gates.LIB_NAME);
         Library plexers    = getLib(lf, Plexers.LIB_NAME);
 
-        ComponentFactory cmp        = find(arithmetic, "Comparator");
-        ComponentFactory k          = find(wiring,     "Constant");
-        ComponentFactory pin        = find(wiring,     "Pin");
-        ComponentFactory bitExtend  = find(wiring,     "Bit Extender", "BitExtender", "Bit Extend");
-        ComponentFactory not        = find(gates,      "NOT Gate", "NOT");
-        ComponentFactory and        = find(gates,      "AND Gate", "AND");
-        ComponentFactory or         = find(gates,      "OR Gate",  "OR");
-        ComponentFactory mux        = find(plexers,    "Multiplexer", "Mux");
-        ComponentFactory podd       = find(gates,      "Odd Parity",  "Parity (Odd)", "Parity-Odd");
-        ComponentFactory pevn       = find(gates,      "Even Parity", "Parity (Even)","Parity-Even");
+        ComponentFactory cmp        = find(arithmetic,  Arithmetic.COMPARATOR_ID);
+        ComponentFactory k          = find(wiring,      Wiring.CONSTANT_ID);
+        ComponentFactory pin        = find(wiring,      Wiring.PIN_ID);
+        ComponentFactory bitExtend  = find(wiring,      Wiring.BIT_EXTENDER_ID, "BitExtender", "Bit Extend");
+        ComponentFactory not        = find(gates,       Gates.NOT_ID, "NOT");
+        ComponentFactory and        = find(gates,       Gates.AND_ID, "AND");
+        ComponentFactory or         = find(gates,       Gates.OR_ID,  "OR");
+        ComponentFactory mux        = find(plexers,     Plexers.MULTIPLEXER_ID, "Mux");
+        ComponentFactory podd       = find(gates,       Gates.ODD_PARITY_ID,  "Parity (Odd)", "Parity-Odd");
+        ComponentFactory pevn       = find(gates,       Gates.EVEN_PARITY_ID, "Parity (Even)","Parity-Even");
 
         return new Factories(cmp, mux, k, bitExtend, not, and, or, podd, pevn, pin);
     }

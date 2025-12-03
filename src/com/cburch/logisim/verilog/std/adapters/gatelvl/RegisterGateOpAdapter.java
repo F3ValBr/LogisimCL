@@ -170,7 +170,7 @@ public final class RegisterGateOpAdapter extends AbstractComponentAdapter
         if (f == null) return null;
         Library mem = f.getLibrary(Memory.LIB_NAME);
         if (mem == null) return null;
-        ComponentFactory cf = FactoryLookup.findFactory(mem, "Register");
+        ComponentFactory cf = FactoryLookup.findFactory(mem, Memory.REGISTER_ID);
         return (cf == null) ? null : new LibFactory(mem, cf);
     }
 

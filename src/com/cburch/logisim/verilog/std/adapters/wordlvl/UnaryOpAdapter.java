@@ -105,8 +105,8 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
                 Library gates = proj.getLogisimFile().getLibrary(Gates.LIB_NAME);
                 if (gates == null) return null;
                 String gateName = switch (op) {
-                    case BUF -> "Buffer";
-                    case NOT -> "NOT Gate";
+                    case BUF -> Gates.BUFFER_ID;
+                    case NOT -> Gates.NOT_ID;
                     default  -> null;
                 };
                 if (gateName == null) return null;
@@ -118,7 +118,7 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
                 // Tu librería con lógicas de Yosys (Logical NOT Gate)
                 Library yosysLib = proj.getLogisimFile().getLibrary(YosysComponent.LIB_NAME);
                 if (yosysLib == null) return null;
-                String name = (op == UnaryOp.LOGIC_NOT) ? "Logical NOT Gate" : null;
+                String name = (op == UnaryOp.LOGIC_NOT) ? YosysComponent.LOGIC_NOT_ID : null;
                 if (name == null) return null;
                 ComponentFactory f = FactoryLookup.findFactory(yosysLib, name);
                 return (f == null) ? null : new LibFactory(yosysLib, f);
@@ -129,13 +129,13 @@ public final class UnaryOpAdapter extends AbstractComponentAdapter
                     case NEG -> {
                         Library arith = proj.getLogisimFile().getLibrary(Arithmetic.LIB_NAME);
                         if (arith == null) return null;
-                        ComponentFactory f = FactoryLookup.findFactory(arith, "Negator");
+                        ComponentFactory f = FactoryLookup.findFactory(arith, Arithmetic.NEGATOR_ID);
                         return (f == null) ? null : new LibFactory(arith, f);
                     }
                     case POS -> {
                         Library gates = proj.getLogisimFile().getLibrary(Gates.LIB_NAME);
                         if (gates == null) return null;
-                        ComponentFactory f = FactoryLookup.findFactory(gates, "Buffer");
+                        ComponentFactory f = FactoryLookup.findFactory(gates, Gates.BUFFER_ID);
                         return (f == null) ? null : new LibFactory(gates, f);
                     }
                     default -> { return null; }

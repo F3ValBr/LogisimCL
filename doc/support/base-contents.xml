@@ -148,6 +148,14 @@
 		<tocitem target="io_dotmat" image="icon_dotmat" />
 		<tocitem target="io_tty" image="icon_tty" />
 	  </tocitem>
+      <tocitem target="yosys">
+        <tocitem target="yosys_logicgates" image="icon_logicgates" />
+        <tocitem target="yosys_pow" image="icon_pow" />
+        <tocitem target="yosys_dynshift" image="icon_dynshift" />
+        <tocitem target="yosys_bitwisemux" image="icon_bitwisemux" />
+        <tocitem target="yosys_prioritymux" image="icon_prioritymux" />
+        <tocitem target="yosys_binarymux" image="icon_binarymux" />
+      </tocitem>
 	  <tocitem target="base">
 		<tocitem target="base_poke" image="icon_poke" />
 		<tocitem target="base_edit" image="icon_edit" />

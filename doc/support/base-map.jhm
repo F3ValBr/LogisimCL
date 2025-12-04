@@ -129,6 +129,13 @@
 	<mapID target="io_hexdig" url="html/libs/io/hexdig.html" />
 	<mapID target="io_dotmat" url="html/libs/io/dotmat.html" />
 	<mapID target="io_tty" url="html/libs/io/tty.html" />
+    <mapID target="yosys" url="html/libs/yosys/index.html" />
+    <mapID target="yosys_logicgates" url="html/libs/yosys/logicgates.html" />
+    <mapID target="yosys_pow" url="html/libs/yosys/pow.html" />
+    <mapID target="yosys_dynshift" url="html/libs/yosys/dynshift.html" />
+    <mapID target="yosys_bitwisemux" url="html/libs/yosys/bitwisemux.html" />
+    <mapID target="yosys_prioritymux" url="html/libs/yosys/prioritymux.html" />
+    <mapID target="yosys_binarymux" url="html/libs/yosys/binarymux.html" />
 	<mapID target="base" url="html/libs/base/index.html" />
 	<mapID target="base_poke" url="html/libs/base/poke.html" />
 	<mapID target="base_edit" url="html/libs/base/edit.html" />
@@ -190,4 +197,10 @@
 	<mapID target="icon_hexdig" url="icons/hexdig.gif" />
 	<mapID target="icon_dotmat" url="icons/dotmat.gif" />
 	<mapID target="icon_tty" url="icons/tty.gif" />
+    <mapID target="icon_logicgates" url="icons/logicand.gif" />
+    <mapID target="icon_pow" url="icons/exponent.gif" />
+    <mapID target="icon_dynshift" url="icons/dynamicShifter.gif" />
+    <mapID target="icon_bitwisemux" url="icons/bwmultiplexer.gif" />
+    <mapID target="icon_prioritymux" url="icons/pmultiplexer.gif" />
+    <mapID target="icon_binarymux" url="icons/bmultiplexer.gif" />
 </map>

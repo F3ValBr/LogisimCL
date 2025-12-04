@@ -83,6 +83,7 @@
 	<mapID target="wiring_pin" url="html/libs/wiring/pin.html" />
 	<mapID target="wiring_probe" url="html/libs/wiring/probe.html" />
 	<mapID target="wiring_tunnel" url="html/libs/wiring/tunnel.html" />
+    <mapID target="wiring_bitlabeledtunnel" url="html/libs/wiring/bitlabeledtunnel.html" />
 	<mapID target="wiring_pull" url="html/libs/wiring/pull.html" />
 	<mapID target="wiring_clock" url="html/libs/wiring/clock.html" />
 	<mapID target="wiring_constant" url="html/libs/wiring/constant.html" />
@@ -158,6 +159,7 @@
 	<mapID target="icon_splitter" url="icons/splitter.gif" />
 	<mapID target="icon_pin" url="icons/pinInput.gif" />
 	<mapID target="icon_tunnel" url="icons/tunnel.gif" />
+    <mapID target="icon_bitlabeledtunnel" url="icons/bltunnel.gif" />
 	<mapID target="icon_pull" url="icons/pullshap.gif" />
 	<mapID target="icon_probe" url="icons/probe.gif" />
 	<mapID target="icon_clock" url="icons/clock.gif" />

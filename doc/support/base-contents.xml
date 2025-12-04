@@ -96,6 +96,7 @@
 		<tocitem target="wiring_pin" image="icon_pin" />
 		<tocitem target="wiring_probe" image="icon_probe" />
 		<tocitem target="wiring_tunnel" image="icon_tunnel" />
+        <tocitem target="wiring_bitlabeledtunnel" image="icon_bitlabeledtunnel" />
 		<tocitem target="wiring_pull" image="icon_pull" />
 		<tocitem target="wiring_clock" image="icon_clock" />
 		<tocitem target="wiring_constant" image="icon_constant" />

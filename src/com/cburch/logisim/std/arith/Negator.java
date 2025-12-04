@@ -33,7 +33,7 @@ public class Negator extends InstanceFactory {
         super(_ID, Strings.getter("negatorComponent"));
         setAttributes(
                 new Attribute[]{ StdAttr.WIDTH, SIGN_MODE },
-                new Object[]   { BitWidth.create(8), MODE_UNSIGNED }
+                new Object[]   { BitWidth.create(8), MODE_SIGNED }
         );
         setKeyConfigurator(new BitWidthConfigurator(StdAttr.WIDTH));
         setOffsetBounds(Bounds.create(-40, -20, 40, 40));

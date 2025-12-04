@@ -120,6 +120,7 @@
 	<mapID target="mem_random" url="html/libs/mem/random.html" />
 	<mapID target="mem_ram" url="html/libs/mem/ram.html" />
 	<mapID target="mem_rom" url="html/libs/mem/rom.html" />
+    <mapID target="mem_timer" url="html/libs/mem/timer.html" />
 	<mapID target="io" url="html/libs/io/index.html" />
 	<mapID target="io_button" url="html/libs/io/button.html" />
 	<mapID target="io_joystick" url="html/libs/io/joystick.html" />
@@ -192,6 +193,7 @@
 	<mapID target="icon_random" url="icons/random.gif" />
 	<mapID target="icon_ram" url="icons/ram.gif" />
 	<mapID target="icon_rom" url="icons/rom.gif" />
+    <mapID target="icon_timer" url="icons/timer.gif" />
 	<mapID target="icon_button" url="icons/button.gif" />
 	<mapID target="icon_joystick" url="icons/joystick.gif" />
 	<mapID target="icon_keyboard" url="icons/keyboard.gif" />
@@ -206,6 +208,6 @@
     <mapID target="icon_bitwisemux" url="icons/bwmultiplexer.gif" />
     <mapID target="icon_prioritymux" url="icons/pmultiplexer.gif" />
     <mapID target="icon_binarymux" url="icons/bmultiplexer.gif" />
-    <mapID target="icon_rv32im" url="icons/rv32im.gif" />
-    <mapID target="icon_rv32im_micro" url="icons/rv32im_micro.gif" />
+    <mapID target="icon_rv32im" url="icons/riscvproc.gif" />
+    <mapID target="icon_rv32im_micro" url="icons/riscvprocmicro.gif" />
 </map>

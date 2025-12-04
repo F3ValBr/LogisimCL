@@ -8,7 +8,6 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class Timer extends InstanceFactory {
 
     public static final String _ID = "Timer";
@@ -34,25 +33,22 @@ public class Timer extends InstanceFactory {
     public Timer() {
         super(_ID, Strings.getter("timerComponent"));
         setOffsetBounds(Bounds.create(-30, -20, 30, 40));
-        setIconName("timer.gif"); // opcional
+        setIconName("timer.gif");
 
         setAttributes(
-                new Attribute[] {
-                        StdAttr.FACING,
+                new Attribute[]{
                         ATTR_MODE,
                         StdAttr.LABEL,
                         StdAttr.LABEL_FONT
                 },
-                new Object[] {
-                        Direction.EAST,
+                new Object[]{
                         MODE_REAL,
                         "",
                         StdAttr.DEFAULT_LABEL_FONT
                 }
         );
-        setFacingAttribute(StdAttr.FACING);
 
-        // Definimos algo por defecto; luego cada instancia se ajusta en configureNewInstance
+        // Puertos base (se ajustarán en configureNewInstance)
         Port[] ps = new Port[3];
         ps[OUT_TIME] = new Port(  0,   0, Port.OUTPUT, 32);
         ps[IN_SEL]   = new Port(-30,   0, Port.INPUT,  1);
@@ -60,27 +56,28 @@ public class Timer extends InstanceFactory {
         setPorts(ps);
     }
 
-    /* ==================== PUERTOS DINÁMICOS ==================== */
+    /* ===================== PUERTOS DINÁMICOS ===================== */
 
     @Override
     protected void configureNewInstance(Instance instance) {
-        // Ajustar puertos según modo inicial
         recomputePorts(instance);
 
-        // Campo de texto para label
         Bounds bds = instance.getBounds();
-        instance.setTextField(StdAttr.LABEL, StdAttr.LABEL_FONT,
-                bds.getX() + bds.getWidth() / 2, bds.getY() - 3,
-                GraphicsUtil.H_CENTER, GraphicsUtil.V_BASELINE);
+        instance.setTextField(
+                StdAttr.LABEL,
+                StdAttr.LABEL_FONT,
+                bds.getX() + bds.getWidth() / 2,
+                bds.getY() - 3,
+                GraphicsUtil.H_CENTER,
+                GraphicsUtil.V_BASELINE
+        );
 
-        // Escuchar cambios de atributos (p.ej. cambio de modo)
         instance.addAttributeListener();
     }
 
     @Override
     public void instanceAttributeChanged(Instance instance, Attribute<?> attr) {
-        if (attr == ATTR_MODE || attr == StdAttr.FACING) {
-            // Cambia el modo → reconstruir puertos (añadir/quitar CK)
+        if (attr == ATTR_MODE) {
             recomputePorts(instance);
         }
     }
@@ -90,17 +87,17 @@ public class Timer extends InstanceFactory {
 
         List<Port> list = new ArrayList<>();
 
-        // 0: OUT_TIME (T)
-        Port pOut = new Port(  0,   0, Port.OUTPUT, 32);
+        // OUT (T)
+        Port pOut = new Port(0, 0, Port.OUTPUT, 32);
         pOut.setToolTip(Strings.getter("timerOutTip"));
         list.add(pOut);
 
-        // 1: IN_SEL (S)
-        Port pSel = new Port(-30,   0, Port.INPUT, 1);
+        // IN_SEL (S)
+        Port pSel = new Port(-30, 0, Port.INPUT, 1);
         pSel.setToolTip(Strings.getter("timerSelTip"));
         list.add(pSel);
 
-        // 2: IN_CLK (CK) SOLO si modo virtual
+        // IN_CLK (solo en modo virtual)
         if (mode == MODE_VIRTUAL) {
             Port pClk = new Port(-30, 10, Port.INPUT, 1);
             pClk.setToolTip(Strings.getter("timerClkTip"));
@@ -110,14 +107,18 @@ public class Timer extends InstanceFactory {
         instance.setPorts(list.toArray(new Port[0]));
         instance.recomputeBounds();
 
-        // Recolocar label según nuevos bounds
-        Bounds bds = instance.getBounds();
-        instance.setTextField(StdAttr.LABEL, StdAttr.LABEL_FONT,
-                bds.getX() + bds.getWidth() / 2, bds.getY() - 3,
-                GraphicsUtil.H_CENTER, GraphicsUtil.V_BASELINE);
+        Bounds b = instance.getBounds();
+        instance.setTextField(
+                StdAttr.LABEL,
+                StdAttr.LABEL_FONT,
+                b.getX() + b.getWidth() / 2,
+                b.getY() - 3,
+                GraphicsUtil.H_CENTER,
+                GraphicsUtil.V_BASELINE
+        );
     }
 
-    /* ==================== DIBUJO ==================== */
+    /* ======================== DIBUJO ======================== */
 
     @Override
     public void paintInstance(InstancePainter painter) {
@@ -131,35 +132,36 @@ public class Timer extends InstanceFactory {
 
         // Puertos
         painter.drawPort(OUT_TIME, "T", Direction.WEST);
+
         g.setColor(Color.GRAY);
-        painter.drawPort(IN_SEL,  "S", Direction.EAST);
+        painter.drawPort(IN_SEL, "S", Direction.EAST);
         g.setColor(Color.BLACK);
 
         if (mode == MODE_VIRTUAL) {
-            // Sólo existe si hemos creado el puerto CK en modo virtual
             painter.drawClock(IN_CLK, Direction.EAST);
         }
 
-        // ==== Dibujar "reloj de arena" (X de esquina a esquina) ====
+        // Reloj de arena (X)
         int x1 = b.getX() + 4;
         int y1 = b.getY() + 4;
         int x2 = b.getX() + b.getWidth()  - 4;
         int y2 = b.getY() + b.getHeight() - 4;
 
-        g.drawLine(x1, y1, x2, y2); // diagonal ↘
-        g.drawLine(x1, y2, x2, y1); // diagonal ↗
+        g.drawLine(x1, y1, x2, y2);
+        g.drawLine(x1, y2, x2, y1);
 
-        // Tag de modo ("R" o "V") al centro
+        // Tag "R" o "V"
         String tag = (mode == MODE_VIRTUAL) ? "V" : "R";
         g.setColor(Color.DARK_GRAY);
         GraphicsUtil.drawText(g, tag,
                 b.getX() + b.getWidth() / 2,
                 b.getY() + b.getHeight() / 8,
-                GraphicsUtil.H_CENTER, GraphicsUtil.V_CENTER);
+                GraphicsUtil.H_CENTER,
+                GraphicsUtil.V_CENTER);
         g.setColor(Color.BLACK);
     }
 
-    /* ==================== SIMULACIÓN ==================== */
+    /* ===================== SIMULACIÓN ===================== */
 
     @Override
     public void propagate(InstanceState state) {
@@ -171,57 +173,39 @@ public class Timer extends InstanceFactory {
 
         AttributeOption mode = state.getAttributeValue(ATTR_MODE);
 
-        // S siempre existe (índice 1)
         Value sel = state.getPort(IN_SEL);
         boolean selNow  = (sel == Value.TRUE);
         boolean selPrev = (data.lastSelect == Value.TRUE);
         boolean selRise = selNow && !selPrev;
 
         if (mode == MODE_VIRTUAL) {
-            // ===== MODO VIRTUAL =====
-            // CK existe sólo en modo virtual (índice 2)
+
             Value clk = state.getPort(IN_CLK);
             boolean clkNow  = (clk == Value.TRUE);
             boolean clkPrev = (data.lastClock == Value.TRUE);
             boolean clkRise = clkNow && !clkPrev;
 
-            // Contamos flancos de subida de CK
-            if (clkRise) {
-                data.virtualTicks++;
-            }
+            if (clkRise) data.virtualTicks++;
 
-            // En flanco de S, entregamos la diferencia de ticks
             if (selRise) {
                 long delta = data.virtualTicks - data.lastVirtualAtTrigger;
                 if (delta < 0) delta = 0;
-                int out = (int) delta; // recorte a 32 bits
-                state.setPort(OUT_TIME, Value.createKnown(BW32, out), 0);
+                state.setPort(OUT_TIME, Value.createKnown(BW32, (int) delta), 0);
                 data.lastVirtualAtTrigger = data.virtualTicks;
             }
 
             data.lastClock = clk;
 
         } else {
-            // ===== MODO REAL =====
             long now = System.currentTimeMillis();
 
             if (selRise) {
-                long delta;
-                if (data.lastRealTime == 0L) {
-                    // Primera medición: dejamos 0
-                    delta = 0L;
-                } else {
-                    delta = now - data.lastRealTime;
-                    if (delta < 0) delta = 0;
-                }
-                int out = (int) delta;
-                state.setPort(OUT_TIME, Value.createKnown(BW32, out), 0);
+                long delta = (data.lastRealTime == 0L) ? 0 : now - data.lastRealTime;
+                if (delta < 0) delta = 0;
+                state.setPort(OUT_TIME, Value.createKnown(BW32, (int) delta), 0);
                 data.lastRealTime = now;
-            } else {
-                // Si quieres, puedes usar esto como “inicio” al pasar a TRUE sin flanco previo
-                if (data.lastRealTime == 0L && selNow) {
-                    data.lastRealTime = now;
-                }
+            } else if (data.lastRealTime == 0L && selNow) {
+                data.lastRealTime = now;
             }
         }
 

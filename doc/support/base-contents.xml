@@ -137,6 +137,7 @@
 		<tocitem target="mem_random" image="icon_random" />
 		<tocitem target="mem_ram" image="icon_ram" />
 		<tocitem target="mem_rom" image="icon_rom" />
+        <tocitem target="mem_timer" image="icon_timer" />
 	  </tocitem>
 	  <tocitem target="io">
 		<tocitem target="io_button" image="icon_button" />

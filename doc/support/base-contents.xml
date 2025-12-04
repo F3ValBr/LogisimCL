@@ -148,6 +148,10 @@
 		<tocitem target="io_dotmat" image="icon_dotmat" />
 		<tocitem target="io_tty" image="icon_tty" />
 	  </tocitem>
+      <tocitem target="riscv">
+        <tocitem target="riscv_rv32im" image="icon_rv32im" />
+        <tocitem target="riscv_rv32im_micro" image="icon_rv32im_micro" />
+      </tocitem>
       <tocitem target="yosys">
         <tocitem target="yosys_logicgates" image="icon_logicgates" />
         <tocitem target="yosys_pow" image="icon_pow" />

@@ -10,8 +10,8 @@
     * **[Descargas](#Descargas)**
     * **[Uso]()**
       * [Importador de SystemVerilog](doc/repo/howtoverilog.md)
-    * [Más Información](#mas-informacion)
-    * [Creditos y contribuciones](#creditos-y-contribuciones)
+    * [Más Información](#más-información)
+    * [Creditos y contribuciones](#créditos-y-contribuciones)
 
 ## Funcionalidades
 
